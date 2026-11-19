@@ -1,8 +1,12 @@
 "use server";
 
+import { randomInt, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { sendParentInvitationEmail } from "@/utils/email/invitation";
 import { createClient as createServerClient } from "@/utils/supabase/server";
+
+type RelationshipType = "father" | "mother" | "guardian";
 
 export type AddKidResult =
   | { ok: true }
@@ -16,7 +20,213 @@ export type AddKidResult =
       };
     };
 
+export type InviteParentResult =
+  | { ok: true; invitationId: string }
+  | { ok: false; message: string };
+
 type BirthDateValidation = { date: Date } | { error: string };
+
+const invitationCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const invitationCodeLength = 5;
+const invitationCodeAttempts = 5;
+
+function createInvitationCode(): string {
+  return Array.from({ length: invitationCodeLength }, () =>
+    invitationCodeAlphabet.charAt(
+      randomInt(0, invitationCodeAlphabet.length),
+    ),
+  ).join("");
+}
+
+function normalizeInvitationInput(input: {
+  fullName: string;
+  email: string;
+  relationship: string;
+  childId: string;
+}) {
+  const relationshipMap: Record<string, RelationshipType> = {
+    father: "father",
+    mother: "mother",
+    guardian: "guardian",
+    "Papá": "father",
+    "Mamá": "mother",
+    "Tutor/a": "guardian",
+  };
+
+  const relationship = relationshipMap[input.relationship];
+  const fullName = input.fullName.trim();
+  const email = input.email.trim().toLowerCase();
+  const childId = input.childId.trim();
+
+  if (!fullName || !childId || !relationship) {
+    return null;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return null;
+  }
+
+  return { fullName, email, relationship, childId };
+}
+
+export async function inviteParent(input: {
+  fullName: string;
+  email: string;
+  relationship: string;
+  childId: string;
+}): Promise<InviteParentResult> {
+  const normalizedInput = normalizeInvitationInput(input);
+  if (!normalizedInput) {
+    return { ok: false, message: "Revisa los datos de la invitación." };
+  }
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(cookieStore);
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+
+  if (!userId) {
+    return {
+      ok: false,
+      message: "Tu sesión expiró. Inicia sesión de nuevo.",
+    };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("user")
+    .select("daycare_id, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (
+    profileError ||
+    !profile ||
+    (profile.role !== "staff" && profile.role !== "admin")
+  ) {
+    return {
+      ok: false,
+      message: "No tienes permiso para enviar invitaciones.",
+    };
+  }
+
+  if (!profile.daycare_id) {
+    return {
+      ok: false,
+      message: "Tu cuenta no tiene una guardería asignada.",
+    };
+  }
+
+  const { data: child, error: childError } = await supabase
+    .from("child")
+    .select("id, full_name, room_id")
+    .eq("id", normalizedInput.childId)
+    .maybeSingle();
+
+  if (childError || !child) {
+    return { ok: false, message: "No se encontró el niño seleccionado." };
+  }
+
+  const { data: room, error: roomError } = await supabase
+    .from("room")
+    .select("daycare_id")
+    .eq("id", child.room_id)
+    .eq("daycare_id", profile.daycare_id)
+    .maybeSingle();
+
+  if (roomError || !room) {
+    return {
+      ok: false,
+      message: "No puedes invitar a un niño de otra guardería.",
+    };
+  }
+
+  const { data: pendingInvitation, error: pendingError } = await supabase
+    .from("invitation")
+    .select("id")
+    .eq("child_id", child.id)
+    .eq("email", normalizedInput.email)
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle();
+
+  if (pendingError) {
+    return {
+      ok: false,
+      message: "No se pudo revisar la invitación existente.",
+    };
+  }
+
+  const expiresAt = new Date(
+    Date.now() + 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  for (let attempt = 0; attempt < invitationCodeAttempts; attempt += 1) {
+    const code = createInvitationCode();
+    const invitationId = pendingInvitation?.id ?? randomUUID();
+    const invitationData = {
+      full_name: normalizedInput.fullName,
+      email: normalizedInput.email,
+      relationship: normalizedInput.relationship,
+      code,
+      status: "pending" as const,
+      expires_at: expiresAt,
+      accepted_at: null,
+    };
+
+    const invitationQuery = pendingInvitation
+      ? supabase
+          .from("invitation")
+          .update(invitationData)
+          .eq("id", invitationId)
+      : supabase.from("invitation").insert({
+          id: invitationId,
+          child_id: child.id,
+          invited_by: userId,
+          ...invitationData,
+        });
+
+    const { error: invitationError } = await invitationQuery;
+    if (!invitationError) {
+      try {
+        await sendParentInvitationEmail({
+          parentName: normalizedInput.fullName,
+          childName: child.full_name,
+          email: normalizedInput.email,
+          code,
+        });
+      } catch {
+        await supabase
+          .from("invitation")
+          .update({
+            status: "cancelled",
+            expires_at: new Date().toISOString(),
+          })
+          .eq("id", invitationId)
+          .eq("status", "pending");
+
+        return {
+          ok: false,
+          message: "No pudimos enviar la invitación. Intenta de nuevo.",
+        };
+      }
+
+      revalidatePath(`/kids/${child.id}`);
+      return { ok: true, invitationId };
+    }
+
+    if (invitationError.code !== "23505") {
+      return {
+        ok: false,
+        message: "No se pudo guardar la invitación.",
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    message: "No se pudo generar un código disponible. Intenta de nuevo.",
+  };
+}
 
 function parseBirthDate(value: string): Date | null {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);

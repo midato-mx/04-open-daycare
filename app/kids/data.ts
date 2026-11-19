@@ -8,6 +8,7 @@ import {
   formatJoinedLabel,
   type AllergyKey,
   type Kid,
+  type KidParent,
 } from "@/app/lib/data";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 
@@ -45,6 +46,7 @@ export interface KidsPageData {
 export interface KidDetailData {
   room: RoomRecord | null;
   child: ChildRecord | null;
+  linkedParents: KidParent[];
   error: KidsDataError | null;
 }
 
@@ -68,6 +70,23 @@ type ChildRow = {
   allergy_tags: string[];
   photo_consent: boolean;
   status: "active" | "archived";
+};
+
+type ParentChildRow = {
+  parent_id: string;
+  relationship: "father" | "mother" | "guardian";
+};
+
+type ParentProfileRow = {
+  id: string;
+  full_name: string;
+};
+
+type InvitationParentRow = {
+  id: string;
+  full_name: string;
+  relationship: "father" | "mother" | "guardian";
+  status: "pending" | "accepted" | "expired" | "cancelled";
 };
 
 const allergyLabels: Record<string, string> = {
@@ -134,6 +153,82 @@ function mapChildRow(child: ChildRow): ChildRecord {
 
 function parseDatabaseDate(value: string): Date {
   return new Date(`${value}T00:00:00`);
+}
+
+function relationshipLabel(
+  relationship: "father" | "mother" | "guardian",
+): string {
+  const labels = {
+    father: "Papá",
+    mother: "Mamá",
+    guardian: "Tutor/a",
+  } as const;
+  return labels[relationship];
+}
+
+async function getLinkedParents(
+  supabase: ServerSupabaseClient,
+  childId: string,
+): Promise<KidParent[]> {
+  const [{ data: links, error: linksError }, { data: invitations, error: invitationsError }] =
+    await Promise.all([
+      supabase
+        .from("parent_child")
+        .select("parent_id, relationship")
+        .eq("child_id", childId),
+      supabase
+        .from("invitation")
+        .select("id, full_name, relationship, status")
+        .eq("child_id", childId)
+        .eq("status", "pending"),
+    ]);
+
+  if (linksError || invitationsError) {
+    return [];
+  }
+
+  const parentIds = Array.from(
+    new Set(
+      ((links ?? []) as ParentChildRow[]).map((link) => link.parent_id),
+    ),
+  );
+  const { data: profiles } =
+    parentIds.length > 0
+      ? await supabase
+          .from("user")
+          .select("id, full_name")
+          .in("id", parentIds)
+      : { data: [] };
+  const profileById = new Map(
+    ((profiles ?? []) as ParentProfileRow[]).map((profile) => [
+      profile.id,
+      profile,
+    ]),
+  );
+
+  const activeParents = ((links ?? []) as ParentChildRow[]).map(
+    (link, index) => ({
+      id: link.parent_id,
+      name: profileById.get(link.parent_id)?.full_name ?? "Padre vinculado",
+      role: relationshipLabel(link.relationship),
+      status: "active" as const,
+      avatarBg: avatarPalette[index % avatarPalette.length].bg,
+    }),
+  );
+  const pendingParents = ((invitations ?? []) as InvitationParentRow[]).map(
+    (invitation, index) => ({
+      id: invitation.id,
+      name: invitation.full_name,
+      role: relationshipLabel(invitation.relationship),
+      status: "pending" as const,
+      avatarBg:
+        avatarPalette[
+          (activeParents.length + index) % avatarPalette.length
+        ].bg,
+    }),
+  );
+
+  return [...activeParents, ...pendingParents];
 }
 
 export function toKidViewModel(
@@ -216,7 +311,12 @@ export async function getKidsPageData(): Promise<KidsPageData> {
 export async function getKidDetailData(id: string): Promise<KidDetailData> {
   const context = await getAuthorizedContext();
   if ("error" in context) {
-    return { room: null, child: null, error: context.error };
+    return {
+      room: null,
+      child: null,
+      linkedParents: [],
+      error: context.error,
+    };
   }
 
   const { supabase, daycareId } = context;
@@ -230,11 +330,16 @@ export async function getKidDetailData(id: string): Promise<KidDetailData> {
     .maybeSingle();
 
   if (childError) {
-    return { room: null, child: null, error: "children-unavailable" };
+    return {
+      room: null,
+      child: null,
+      linkedParents: [],
+      error: "children-unavailable",
+    };
   }
 
   if (!childData) {
-    return { room: null, child: null, error: null };
+    return { room: null, child: null, linkedParents: [], error: null };
   }
 
   const child = mapChildRow(childData as ChildRow);
@@ -246,12 +351,18 @@ export async function getKidDetailData(id: string): Promise<KidDetailData> {
     .maybeSingle();
 
   if (roomError || !roomData) {
-    return { room: null, child: null, error: "rooms-unavailable" };
+    return {
+      room: null,
+      child: null,
+      linkedParents: [],
+      error: "rooms-unavailable",
+    };
   }
 
   return {
     room: roomData as RoomRecord,
     child,
+    linkedParents: await getLinkedParents(supabase, child.id),
     error: null,
   };
 }
