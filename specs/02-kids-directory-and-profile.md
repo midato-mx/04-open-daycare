@@ -10,7 +10,7 @@
 **In:**
 
 - Extender `app/components/Sidebar.tsx` con prop `activeItem: "feed" | "kids"`; el ítem activo usa fondo `#FBE3D8` / texto `#D9583C`. Actualizar `app/page.tsx` para pasar `activeItem="feed"`. Nav label «Niños» con `href="/kids"`.
-- Ruta `/kids` (`app/kids/page.tsx`): header «GESTIÓN / Niños», botón «Agregar niño» (`href="#"`), buscador visual (input sin lógica), encabezado de sala «SALA SOLES · 8 niños», grid de 2 columnas con las 8 tarjetas del mockup.
+- Ruta `/kids` (`app/kids/page.tsx`): header «GESTIÓN / Niños», botón «Agregar niño» (`href="#"`), buscador visual (input sin lógica), encabezado de sala «SALA SOLES · 8 niños», grid de 2 columnas con las 8 tarjetas del mockup. El número de padres se obtiene de las relaciones reales `parent_child` y de las invitaciones pendientes.
 - Componente `app/components/KidCard.tsx`: avatar con inicial + color, nombre, «N años · X padres vinculados» (o «sin padres vinculados»), badge de alergia (MANÍ / LACTOSA) o badge VINCULAR (si 0 padres) o chevron; hover `#F2A78E` + `translateY(-2px)`.
 - Ruta `/kids/[id]` (`app/kids/[id]/page.tsx`): resuelve `params.id` contra el array estático. Link «Volver a Niños» → `/kids`. Cabecera (avatar 84px, nombre, «N años · Sala Soles», botón «Editar» → `href="#"`). Caja «Alergias y notas» **solo si el niño tiene alergia/notas**. Tarjeta de datos (fecha de nacimiento, sala, ingreso). Columna derecha: botón «Resumen del día» (`href="#"`) y card «PADRES VINCULADOS» con lista de padres (badges ACTIVA/PENDIENTE) y «Vincular otro padre» (`href="#"`).
 - Datos estáticos en `app/lib/data.ts`: array de 8 niños del mockup + enumeración de alergias con colores + padres ficticios.
@@ -90,6 +90,7 @@ Reglas derivadas (no se guardan duplicadas):
 - [x] El input «Buscar niño…» es solo visual: sin `onChange`, `useState` ni filtrado.
 - [x] Se muestran exactamente 8 tarjetas desde el array `kids`, en grid de 2 columnas.
 - [x] Las tarjetas muestran el badge correcto: MANÍ (Mateo), LACTOSA (Tomás), VINCULAR (Valentina), chevron (el resto).
+- [x] Las tarjetas muestran el número real de padres vinculados, derivado de `linkedParents.length`; las invitaciones pendientes conservan el estado `PENDIENTE`.
 - [x] El hover de las tarjetas cambia el borde a `#F2A78E` y aplica `translateY(-2px)`.
 - [x] `/kids/[id]` resuelve el niño por `params.id`; Mateo replica el mockup de perfil.
 - [x] Sin `allergyNotes`, la caja «Alergias y notas» no se renderiza.

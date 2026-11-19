@@ -40,6 +40,7 @@ export interface ChildRecord {
 export interface KidsPageData {
   rooms: RoomRecord[];
   children: ChildRecord[];
+  linkedParentsByChildId: Map<string, KidParent[]>;
   error: KidsDataError | null;
 }
 
@@ -73,6 +74,7 @@ type ChildRow = {
 };
 
 type ParentChildRow = {
+  child_id: string;
   parent_id: string;
   relationship: "father" | "mother" | "guardian";
 };
@@ -84,6 +86,7 @@ type ParentProfileRow = {
 
 type InvitationParentRow = {
   id: string;
+  child_id: string;
   full_name: string;
   relationship: "father" | "mother" | "guardian";
   status: "pending" | "accepted" | "expired" | "cancelled";
@@ -166,25 +169,29 @@ function relationshipLabel(
   return labels[relationship];
 }
 
-async function getLinkedParents(
+async function getLinkedParentsByChildIds(
   supabase: ServerSupabaseClient,
-  childId: string,
-): Promise<KidParent[]> {
+  childIds: string[],
+): Promise<Map<string, KidParent[]>> {
+  const parentsByChildId = new Map<string, KidParent[]>();
+
+  if (childIds.length === 0) return parentsByChildId;
+
   const [{ data: links, error: linksError }, { data: invitations, error: invitationsError }] =
     await Promise.all([
       supabase
         .from("parent_child")
-        .select("parent_id, relationship")
-        .eq("child_id", childId),
+        .select("child_id, parent_id, relationship")
+        .in("child_id", childIds),
       supabase
         .from("invitation")
-        .select("id, full_name, relationship, status")
-        .eq("child_id", childId)
+        .select("id, child_id, full_name, relationship, status")
+        .in("child_id", childIds)
         .eq("status", "pending"),
     ]);
 
   if (linksError || invitationsError) {
-    return [];
+    return parentsByChildId;
   }
 
   const parentIds = Array.from(
@@ -206,35 +213,38 @@ async function getLinkedParents(
     ]),
   );
 
-  const activeParents = ((links ?? []) as ParentChildRow[]).map(
-    (link, index) => ({
+  for (const link of (links ?? []) as ParentChildRow[]) {
+    const childParents = parentsByChildId.get(link.child_id) ?? [];
+    childParents.push({
       id: link.parent_id,
       name: profileById.get(link.parent_id)?.full_name ?? "Padre vinculado",
       role: relationshipLabel(link.relationship),
-      status: "active" as const,
-      avatarBg: avatarPalette[index % avatarPalette.length].bg,
-    }),
-  );
-  const pendingParents = ((invitations ?? []) as InvitationParentRow[]).map(
-    (invitation, index) => ({
+      status: "active",
+      avatarBg: avatarPalette[childParents.length % avatarPalette.length].bg,
+    });
+    parentsByChildId.set(link.child_id, childParents);
+  }
+
+  for (const invitation of (invitations ?? []) as InvitationParentRow[]) {
+    const childParents = parentsByChildId.get(invitation.child_id) ?? [];
+    childParents.push({
       id: invitation.id,
       name: invitation.full_name,
       role: relationshipLabel(invitation.relationship),
-      status: "pending" as const,
-      avatarBg:
-        avatarPalette[
-          (activeParents.length + index) % avatarPalette.length
-        ].bg,
-    }),
-  );
+      status: "pending",
+      avatarBg: avatarPalette[childParents.length % avatarPalette.length].bg,
+    });
+    parentsByChildId.set(invitation.child_id, childParents);
+  }
 
-  return [...activeParents, ...pendingParents];
+  return parentsByChildId;
 }
 
 export function toKidViewModel(
   child: ChildRecord,
   roomName: string,
   index: number,
+  linkedParents: KidParent[] = [],
 ): Kid {
   const birthDate = parseDatabaseDate(child.birthDate);
   const enrolledAt = parseDatabaseDate(child.enrolledAt);
@@ -264,14 +274,19 @@ export function toKidViewModel(
     avatarFg: avatar.fg,
     allergy,
     allergyNotes: allergyNotes || undefined,
-    linkedParents: [],
+    linkedParents,
   };
 }
 
 export async function getKidsPageData(): Promise<KidsPageData> {
   const context = await getAuthorizedContext();
   if ("error" in context) {
-    return { rooms: [], children: [], error: context.error };
+    return {
+      rooms: [],
+      children: [],
+      linkedParentsByChildId: new Map(),
+      error: context.error,
+    };
   }
 
   const { supabase, daycareId } = context;
@@ -282,7 +297,12 @@ export async function getKidsPageData(): Promise<KidsPageData> {
     .order("name");
 
   if (roomsError) {
-    return { rooms: [], children: [], error: "rooms-unavailable" };
+    return {
+      rooms: [],
+      children: [],
+      linkedParentsByChildId: new Map(),
+      error: "rooms-unavailable",
+    };
   }
 
   const { data: childData, error: childrenError } = await supabase
@@ -297,13 +317,20 @@ export async function getKidsPageData(): Promise<KidsPageData> {
     return {
       rooms: (roomData ?? []) as RoomRow[],
       children: [],
+      linkedParentsByChildId: new Map(),
       error: "children-unavailable",
     };
   }
 
+  const children = ((childData ?? []) as ChildRow[]).map(mapChildRow);
+
   return {
     rooms: (roomData ?? []) as RoomRow[],
-    children: ((childData ?? []) as ChildRow[]).map(mapChildRow),
+    children,
+    linkedParentsByChildId: await getLinkedParentsByChildIds(
+      supabase,
+      children.map((child) => child.id),
+    ),
     error: null,
   };
 }
@@ -362,7 +389,9 @@ export async function getKidDetailData(id: string): Promise<KidDetailData> {
   return {
     room: roomData as RoomRecord,
     child,
-    linkedParents: await getLinkedParents(supabase, child.id),
+    linkedParents:
+      (await getLinkedParentsByChildIds(supabase, [child.id])).get(child.id) ??
+      [],
     error: null,
   };
 }

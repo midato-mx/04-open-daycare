@@ -3,13 +3,15 @@ import KidCard from "@/app/components/KidCard";
 import { getKidsPageData, toKidViewModel } from "@/app/kids/data";
 
 export default async function Kids() {
-  const { rooms, children, error } = await getKidsPageData();
+  const { rooms, children, linkedParentsByChildId, error } =
+    await getKidsPageData();
   const roomNames = new Map(rooms.map((room) => [room.id, room.name]));
   const kids = children.map((child, index) =>
     toKidViewModel(
       child,
       roomNames.get(child.roomId) ?? "Sala no disponible",
       index,
+      linkedParentsByChildId.get(child.id) ?? [],
     ),
   );
 
