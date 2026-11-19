@@ -2,6 +2,13 @@
   "$schema": "https://opencode.ai/config.json",
   "lsp": true,
   "formatter": true,
+  "agents": {
+    "spec-verifier": {
+      "description": "Verifica, corrige y marca los checks del Acceptance criteria de un spec usando Context7, Playwright y visión.",
+      "mode": "all",
+      "model": "openai/gpt-5.6-luna"
+    }
+  },
   "command": {
     "spec": {
       "description": "Crea especificaciones de pantallas y funcionalidades",
@@ -10,6 +17,16 @@
     "spec-impl": {
       "description": "Implementa especificaciones de pantallas y funcionalidades",
       "template": "Carga y sigue la skill spec-impl en .agents/skills/spec-impl/SKILL.md.\n\nFeature: $ARGUMENTS"
+    },
+    "accessibility-checker": {
+      "description": "Revisa y corrige accesibilidad WCAG 2.2 AA en archivos indicados",
+      "agent": "accessibility-checker",
+      "template": "Revisa exclusivamente los archivos o directorios indicados contra WCAG 2.2 AA y aplica correcciones seguras, siguiendo las instrucciones de `.opencode/agent/accessibility-checker.md`.\n\nArchivos o directorios objetivo: $ARGUMENTS"
+    },
+    "react-best-practices": {
+      "description": "Revisa y mejora código React con buenas prácticas actuales",
+      "agent": "react-best-practices",
+      "template": "Revisa exclusivamente los archivos o directorios indicados y aplica mejoras justificadas de React, siguiendo las instrucciones de `.opencode/agent/react-best-practices.md`.\n\nArchivos o directorios objetivo: $ARGUMENTS"
     }
   },
   "references": {

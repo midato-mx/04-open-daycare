@@ -40,6 +40,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - /spec-verify Verifica un spec con el agente `spec-verifier` (`.opencode/agent/spec-verifier.md`): revisa cada criterio de `Acceptance criteria` con evidencia (`npx tsc --noEmit`, `npx eslint app/`, Context7, Playwright MCP + visión), corrige fallos locales, marca los checks en el spec y entrega un reporte en tabla. No cambia `Status:` ni hace commit.
 - Hay skills locales en `.agents/skills/`: `spec` (diseña un spec en `specs/NN-slug.md`, en el idioma del prompt inicial), `spec-impl` (implementa solo specs en estado `Approved`/`Aprobado`, creando rama `spec-NN-slug`; nunca commitear automáticamente) y, de la colección oficial `supabase/agent-skills`: `supabase` (cualquier tarea que toque Supabase: Database, Auth, Edge Functions, Realtime, Storage, RLS, CLI/MCP, debugging y logs) y `supabase-postgres-best-practices` (carga **antes** de escribir o cambiar algo que viva en Postgres: tablas, columnas, índices, funciones, triggers, RLS, migraciones o diagnóstico de rendimiento).
 
+## Subagentes especializados
+
+- `/accessibility-checker` (`.opencode/agent/accessibility-checker.md`): revisa exclusivamente los archivos indicados frente a WCAG 2.2 AA, corrige problemas confirmados de accesibilidad y valida con TypeScript, ESLint y Playwright cuando aplica.
+- `/react-best-practices` (`.opencode/agent/react-best-practices.md`): revisa y mejora los archivos React indicados, enfocándose en composición, hooks, estado, rendimiento, accesibilidad y tipado; consulta Context7 antes de aplicar recomendaciones dependientes de React, Next.js o sus librerías.
+
 ## MCPs
 
 - Usa Context7 como herramienta para consultar documentación técnica actualizada de frameworks, bibliotecas y tecnologías que encuentres en este proyecto y necesites consultar, verificar y actualizar.
