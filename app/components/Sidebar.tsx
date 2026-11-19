@@ -1,9 +1,18 @@
+"use client";
+
 import Link from "next/link";
-import { currentUser } from "@/app/lib/data";
+import { usePathname } from "next/navigation";
 import CreatePostDialog from "@/app/components/CreatePostDialog";
 import LogoutButton from "@/app/components/LogoutButton";
+import type { AuthenticatedUserProfile } from "@/app/lib/authenticated-user";
 
 export type SidebarNavItem = "feed" | "kids";
+
+const roleLabels: Record<AuthenticatedUserProfile["role"], string> = {
+  staff: "Maestra",
+  parent: "Familiar",
+  admin: "Administradora",
+};
 
 function navItemClassName(isActive: boolean) {
   return `flex items-center gap-3 rounded-[12px] px-3 py-[11px] text-[14.5px] ${
@@ -13,7 +22,19 @@ function navItemClassName(isActive: boolean) {
   }`;
 }
 
-export default function Sidebar({ activeItem }: { activeItem: SidebarNavItem }) {
+export default function Sidebar({
+  profile,
+}: {
+  profile: AuthenticatedUserProfile | null;
+}) {
+  const pathname = usePathname();
+  const activeItem: SidebarNavItem = pathname.startsWith("/kids")
+    ? "kids"
+    : "feed";
+  const displayName = profile?.full_name || "Usuario";
+  const displayRole = profile ? roleLabels[profile.role] : "Rol no disponible";
+  const initial = displayName.trim().charAt(0).toUpperCase() || "U";
+
   return (
     <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col border-r border-[#ECE0D0] bg-[#FFFDF9] px-4 py-6">
       <a
@@ -36,13 +57,8 @@ export default function Sidebar({ activeItem }: { activeItem: SidebarNavItem }) 
             <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
           </svg>
         </span>
-        <span className="flex flex-col">
-          <span className="font-display text-[17px] leading-none font-semibold text-[#3F362E]">
-            OpenDayCare
-          </span>
-          <span className="mt-0.5 text-[11.5px] text-[#A89A8B]">
-            {currentUser.room}
-          </span>
+        <span className="font-display text-[17px] leading-none font-semibold text-[#3F362E]">
+          OpenDayCare
         </span>
       </a>
 
@@ -127,14 +143,14 @@ export default function Sidebar({ activeItem }: { activeItem: SidebarNavItem }) 
       <div className="mt-2.5 border-t border-[#ECE0D0] pt-3.5">
         <div className="flex items-center gap-[11px] px-2 py-1.5">
           <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-[#F2937A] font-display text-[16px] font-semibold text-white">
-            {currentUser.initial}
+            {initial}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-[14px] font-extrabold text-[#3F362E]">
-              {currentUser.name}
+              {displayName}
             </span>
             <span className="text-[12px] text-[#A89A8B]">
-              {currentUser.role}
+              {displayRole}
             </span>
           </span>
           <LogoutButton />

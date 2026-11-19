@@ -1,6 +1,5 @@
 import AddKidDialog from "@/app/components/AddKidDialog";
 import KidCard from "@/app/components/KidCard";
-import Sidebar from "@/app/components/Sidebar";
 import { getKidsPageData, toKidViewModel } from "@/app/kids/data";
 
 export default async function Kids() {
@@ -15,10 +14,8 @@ export default async function Kids() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#F6ECDF]">
-      <Sidebar activeItem="kids" />
-      <main className="h-screen min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[880px] px-10 pt-[34px] pb-20">
+    <main className="h-screen min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[880px] px-10 pt-[34px] pb-20">
           <div className="mb-[22px] flex items-end justify-between gap-4">
             <div>
               <div className="mb-1 text-[12.5px] font-extrabold tracking-[0.8px] text-[#D9583C]">
@@ -83,8 +80,7 @@ export default async function Kids() {
               ))}
             </div>
           )}
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

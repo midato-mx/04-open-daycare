@@ -1,5 +1,4 @@
 import FeedPostCard from "@/app/components/FeedPostCard";
-import Sidebar from "@/app/components/Sidebar";
 import { getFeedPageData } from "@/app/feed/data";
 
 export default async function Home() {
@@ -7,11 +6,9 @@ export default async function Home() {
   const firstName = feed.profile?.full_name.split(" ")[0] ?? "familia";
 
   return (
-    <div className="flex min-h-screen bg-[#F6ECDF]">
-      <Sidebar activeItem="feed" />
-      <main className="h-screen min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[760px] px-10 pt-[34px] pb-20">
-          <header className="mb-6">
+    <main className="h-screen min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[760px] px-10 pt-[34px] pb-20">
+        <header className="mb-6">
             <div className="mb-1 text-[12.5px] font-extrabold tracking-[0.8px] text-[#D9583C]">
               GUARDERÍA · SALA SOLES
             </div>
@@ -21,9 +18,9 @@ export default async function Home() {
             <p className="mt-[5px] mb-0 text-[14.5px] text-[#94887B]">
               {feed.kidsCount} niños · {feed.dateLabel}
             </p>
-          </header>
+        </header>
 
-          {feed.canCompose ? (
+        {feed.canCompose ? (
             <a
               href="#"
               className="mb-6 flex items-center gap-3.5 rounded-[18px] border border-[#ECE0D0] bg-[#FFFDF9] px-[18px] py-3.5 shadow-[0_4px_14px_-10px_rgba(120,90,60,0.4)]"
@@ -38,16 +35,16 @@ export default async function Home() {
                 <span aria-hidden="true">📷</span>
               </span>
             </a>
-          ) : null}
+        ) : null}
 
-          <div className="mb-3.5 flex items-center gap-3.5">
+        <div className="mb-3.5 flex items-center gap-3.5">
             <span className="text-[12.5px] font-extrabold tracking-[0.8px] text-[#8A7C6D]">
               PUBLICADO HOY
             </span>
             <span className="h-px flex-1 bg-[#E7DAC8]" />
-          </div>
+        </div>
 
-          <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
             {feed.error ? (
               <div className="rounded-[16px] border border-[#F0C9BE] bg-[#FFF4F0] px-5 py-4 text-[14px] text-[#B8432F]">
                 {feed.error}
@@ -61,9 +58,8 @@ export default async function Home() {
                 Todavía no hay publicaciones para mostrar.
               </div>
             )}
-          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
