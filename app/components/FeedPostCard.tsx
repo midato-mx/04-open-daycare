@@ -1,12 +1,21 @@
 import type { FeedPost, PostType } from "@/app/lib/data";
 
-const BADGE: Record<PostType, { label: string; colors: string }> = {
+type FeedPostCardProps = Readonly<{
+  post: FeedPost;
+}>;
+
+type Badge = {
+  label: string;
+  colors: string;
+};
+
+const BADGE: Record<PostType, Badge> = {
   achievement: { label: "LOGRO", colors: "bg-[#CFEBD8] text-[#3E9B6C]" },
   activity: { label: "ACTIVIDAD", colors: "bg-[#C7E7F1] text-[#2E89A6]" },
   announcement: { label: "ANUNCIO", colors: "bg-[#CCD8F4] text-[#4E72C8]" },
 };
 
-export default function FeedPostCard({ post }: { post: FeedPost }) {
+export default function FeedPostCard({ post }: FeedPostCardProps) {
   const badge = BADGE[post.type];
 
   return (
@@ -57,8 +66,9 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
       </p>
 
       {post.photoLabel && (
-        <a
-          href="#"
+        <div
+          role="img"
+          aria-label={post.photoLabel}
           className="mt-3.5 flex h-[200px] flex-col items-center justify-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[#DBCDBA] bg-[#F4ECE1] text-[#B0A290]"
         >
           <svg
@@ -77,7 +87,7 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
             <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21" />
           </svg>
           <span className="text-[13.5px]">{post.photoLabel}</span>
-        </a>
+        </div>
       )}
 
       <div className="mt-4 flex items-center gap-[18px] border-t border-[#F0E6D8] pt-3.5">
@@ -97,10 +107,7 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
           </svg>
           {post.likes}
         </span>
-        <a
-          href="#"
-          className="flex items-center gap-[7px] text-[14px] font-bold text-[#94887B]"
-        >
+        <span className="flex items-center gap-[7px] text-[14px] font-bold text-[#94887B]">
           <svg
             width="18"
             height="18"
@@ -115,14 +122,11 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" />
           </svg>
           {post.comments}
-        </a>
+        </span>
         <span className="flex-1" />
-        <a
-          href="#"
-          className="text-[14px] font-extrabold text-[#C5503A]"
-        >
+        <span className="text-[14px] font-extrabold text-[#C5503A]">
           Editar
-        </a>
+        </span>
       </div>
     </article>
   );

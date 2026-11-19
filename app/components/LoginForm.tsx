@@ -1,6 +1,7 @@
 "use client";
 
-import { type SyntheticEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -15,8 +16,12 @@ export default function LoginForm() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
 
     const nextFieldErrors: typeof fieldErrors = {};
     const normalizedEmail = email.trim();
@@ -36,61 +41,109 @@ export default function LoginForm() {
     }
 
     setIsSubmitting(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
 
-    if (error) {
-      setAuthError(
-        error.message.toLowerCase().includes("invalid login credentials")
-          ? "El correo o la contraseña no son correctos."
-          : "No pudimos iniciar sesión. Inténtalo de nuevo.",
-      );
+      if (error) {
+        setAuthError(
+          error.code === "invalid_credentials"
+            ? "El correo o la contraseña no son correctos."
+            : "No pudimos iniciar sesión. Inténtalo de nuevo.",
+        );
+        return;
+      }
+
+      router.replace("/");
+    } catch {
+      setAuthError("No pudimos iniciar sesión. Inténtalo de nuevo.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
+  }
 
-    router.replace("/");
+  function handleEmailChange(value: string) {
+    setEmail(value);
+    setFieldErrors((currentErrors) => {
+      if (!currentErrors.email) {
+        return currentErrors;
+      }
+
+      const remainingErrors = { ...currentErrors };
+      delete remainingErrors.email;
+      return remainingErrors;
+    });
+    setAuthError(null);
+  }
+
+  function handlePasswordChange(value: string) {
+    setPassword(value);
+    setFieldErrors((currentErrors) => {
+      if (!currentErrors.password) {
+        return currentErrors;
+      }
+
+      const remainingErrors = { ...currentErrors };
+      delete remainingErrors.password;
+      return remainingErrors;
+    });
+    setAuthError(null);
   }
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="mb-[9px] text-[12px] font-bold tracking-[0.7px] text-[#94887B]">
+      <label
+        htmlFor="login-email"
+        className="mb-[9px] block text-[12px] font-bold tracking-[0.7px] text-[#94887B]"
+      >
         EMAIL
-      </div>
+      </label>
       <input
+        id="login-email"
+        name="email"
         type="email"
         value={email}
-        onChange={(event) => setEmail(event.target.value)}
+        onChange={(event) => handleEmailChange(event.target.value)}
         autoComplete="email"
         aria-invalid={Boolean(fieldErrors.email)}
         aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
-        className={`w-full rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] text-[#3F362E] focus:outline-none ${
+        autoCapitalize="none"
+        spellCheck={false}
+        className={`w-full rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] text-[#3F362E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5503A] focus-visible:ring-offset-2 ${
           fieldErrors.email ? "border-[#D9583C]" : "border-[#EADFD0]"
         }`}
       />
       {fieldErrors.email && (
-        <p id="login-email-error" className="mt-1.5 mb-[18px] text-[13px] text-[#D9583C]">
+        <p
+          id="login-email-error"
+          className="mt-1.5 mb-[18px] text-[13px] text-[#D9583C]"
+        >
           {fieldErrors.email}
         </p>
       )}
       {!fieldErrors.email && <div className="mb-[18px]" />}
-      <div className="mb-2 text-[12px] font-bold tracking-[0.7px] text-[#94887B]">
+      <label
+        htmlFor="login-password"
+        className="mb-2 block text-[12px] font-bold tracking-[0.7px] text-[#94887B]"
+      >
         CONTRASEÑA
-      </div>
+      </label>
       <input
+        id="login-password"
+        name="password"
         type="password"
         value={password}
-        onChange={(event) => setPassword(event.target.value)}
+        onChange={(event) => handlePasswordChange(event.target.value)}
         autoComplete="current-password"
         placeholder="••••••••"
         aria-invalid={Boolean(fieldErrors.password)}
         aria-describedby={
           fieldErrors.password ? "login-password-error" : undefined
         }
-        className={`w-full rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] text-[#3F362E] placeholder:text-[#B6A99B] focus:outline-none ${
+        className={`w-full rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] text-[#3F362E] placeholder:text-[#B6A99B] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5503A] focus-visible:ring-offset-2 ${
           fieldErrors.password ? "border-[#D9583C]" : "border-[#EADFD0]"
         }`}
       />
@@ -121,6 +174,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={isSubmitting}
+        aria-busy={isSubmitting}
         className="block w-full rounded-[15px] p-[15px] text-center text-[16px] font-extrabold text-white shadow-[0_10px_22px_-8px_rgba(238,129,100,0.7)]"
         style={{
           background: "linear-gradient(180deg,#F4977E,#EE8164)",
@@ -131,9 +185,12 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-[14.5px] text-[#94887B]">
         ¿Te invitó la guardería?{" "}
-        <a href="/activate-account" className="font-extrabold text-[#C5503A]">
+        <Link
+          href="/activate-account"
+          className="font-extrabold text-[#C5503A]"
+        >
           Activa tu cuenta
-        </a>
+        </Link>
       </p>
     </form>
   );

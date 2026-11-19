@@ -28,17 +28,16 @@ export default function Sidebar({
   profile: AuthenticatedUserProfile | null;
 }) {
   const pathname = usePathname();
-  const activeItem: SidebarNavItem = pathname.startsWith("/kids")
-    ? "kids"
-    : "feed";
-  const displayName = profile?.full_name || "Usuario";
+  const activeItem: SidebarNavItem =
+    pathname === "/kids" || pathname.startsWith("/kids/") ? "kids" : "feed";
+  const displayName = profile?.full_name.trim() || "Usuario";
   const displayRole = profile ? roleLabels[profile.role] : "Rol no disponible";
-  const initial = displayName.trim().charAt(0).toUpperCase() || "U";
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col border-r border-[#ECE0D0] bg-[#FFFDF9] px-4 py-6">
-      <a
-        href="#"
+      <Link
+        href="/"
         className="flex items-center gap-[11px] px-2 pb-[22px] pt-1"
       >
         <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[12px] bg-[linear-gradient(155deg,#F8C3A8,#F2937A)]">
@@ -60,12 +59,16 @@ export default function Sidebar({
         <span className="font-display text-[17px] leading-none font-semibold text-[#3F362E]">
           OpenDayCare
         </span>
-      </a>
+      </Link>
 
       <CreatePostDialog />
 
       <nav className="flex flex-1 flex-col gap-1">
-        <Link href="/" className={navItemClassName(activeItem === "feed")}>
+        <Link
+          href="/"
+          aria-current={activeItem === "feed" ? "page" : undefined}
+          className={navItemClassName(activeItem === "feed")}
+        >
           <svg
             width="19"
             height="19"
@@ -81,7 +84,11 @@ export default function Sidebar({
           </svg>
           Feed
         </Link>
-        <Link href="/kids" className={navItemClassName(activeItem === "kids")}>
+        <Link
+          href="/kids"
+          aria-current={activeItem === "kids" ? "page" : undefined}
+          className={navItemClassName(activeItem === "kids")}
+        >
           <svg
             width="19"
             height="19"
@@ -99,10 +106,7 @@ export default function Sidebar({
           </svg>
           Niños
         </Link>
-        <a
-          href="#"
-          className="flex items-center gap-3 rounded-[12px] bg-transparent px-3 py-[11px] text-[14.5px] font-semibold text-[#6E6359]"
-        >
+        <span className="flex items-center gap-3 rounded-[12px] bg-transparent px-3 py-[11px] text-[14.5px] font-semibold text-[#6E6359]">
           <svg
             width="19"
             height="19"
@@ -117,11 +121,8 @@ export default function Sidebar({
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
           </svg>
           Avisos
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 rounded-[12px] bg-transparent px-3 py-[11px] text-[14.5px] font-semibold text-[#6E6359]"
-        >
+        </span>
+        <span className="flex items-center gap-3 rounded-[12px] bg-transparent px-3 py-[11px] text-[14.5px] font-semibold text-[#6E6359]">
           <svg
             width="19"
             height="19"
@@ -137,7 +138,7 @@ export default function Sidebar({
             <circle cx="12" cy="7" r="4" />
           </svg>
           Mi cuenta
-        </a>
+        </span>
       </nav>
 
       <div className="mt-2.5 border-t border-[#ECE0D0] pt-3.5">
@@ -149,9 +150,7 @@ export default function Sidebar({
             <span className="text-[14px] font-extrabold text-[#3F362E]">
               {displayName}
             </span>
-            <span className="text-[12px] text-[#A89A8B]">
-              {displayRole}
-            </span>
+            <span className="text-[12px] text-[#A89A8B]">{displayRole}</span>
           </span>
           <LogoutButton />
         </div>

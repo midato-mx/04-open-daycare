@@ -135,13 +135,13 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
       return;
     }
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isSaving) {
         closeModal();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, closeModal]);
+  }, [isOpen, isSaving, closeModal]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -208,24 +208,34 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
       {isOpen ? (
         <div
           className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-[rgba(40,32,26,0.5)] px-6 py-10"
-          onClick={closeModal}
+          onClick={isSaving ? undefined : closeModal}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-kid-dialog-title"
             className="h-fit w-full max-w-[520px] overflow-hidden rounded-[24px] border border-[#ECE0D0] bg-[#FBF4EC] shadow-[0_20px_50px_-24px_rgba(63,54,46,0.35)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              aria-describedby={errors.form ? "add-kid-form-error" : undefined}
+            >
               <div className="flex items-center justify-between border-b border-[#ECE0D0] px-[26px] py-5">
                 <button
                   type="button"
                   onClick={closeModal}
+                  disabled={isSaving}
                   className="cursor-pointer border-none bg-transparent p-0 text-[15px] font-bold text-[#94887B]"
                 >
                   Cancelar
                 </button>
-                <span className="font-display text-[18px] font-semibold text-[#3F362E]">
+                <h2
+                  id="add-kid-dialog-title"
+                  className="font-display text-[18px] font-semibold text-[#3F362E]"
+                >
                   Agregar niño
-                </span>
+                </h2>
                 <button
                   type="submit"
                   disabled={isSaving}
@@ -237,14 +247,15 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
 
               <div className="px-[26px] py-6">
                 {errors.form ? (
-                  <p className={`mb-[18px] ${errorClassName}`}>
+                  <p
+                    id="add-kid-form-error"
+                    role="alert"
+                    className={`mb-[18px] ${errorClassName}`}
+                  >
                     {errors.form}
                   </p>
                 ) : null}
-                <label
-                  htmlFor="add-kid-full-name"
-                  className={labelClassName}
-                >
+                <label htmlFor="add-kid-full-name" className={labelClassName}>
                   NOMBRE COMPLETO
                 </label>
                 <input
@@ -253,6 +264,10 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                   ref={fullNameInputRef}
                   type="text"
                   value={fullName}
+                  aria-invalid={Boolean(errors.fullName)}
+                  aria-describedby={
+                    errors.fullName ? "add-kid-full-name-error" : undefined
+                  }
                   onChange={(event) => {
                     setFullName(event.target.value);
                     setErrors((prev) => withoutError(prev, "fullName"));
@@ -263,7 +278,11 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                   } ${fieldBorder(Boolean(errors.fullName))}`}
                 />
                 {errors.fullName ? (
-                  <p className={`mb-[18px] ${errorClassName}`}>
+                  <p
+                    id="add-kid-full-name-error"
+                    role="alert"
+                    className={`mb-[18px] ${errorClassName}`}
+                  >
                     {errors.fullName}
                   </p>
                 ) : null}
@@ -282,6 +301,12 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                       type="text"
                       inputMode="numeric"
                       value={birthDate}
+                      aria-invalid={Boolean(errors.birthDate)}
+                      aria-describedby={
+                        errors.birthDate
+                          ? "add-kid-birth-date-error"
+                          : undefined
+                      }
                       onChange={(event) => {
                         setBirthDate(maskBirthDate(event.target.value));
                         setErrors((prev) => withoutError(prev, "birthDate"));
@@ -292,7 +317,13 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                       )}`}
                     />
                     {errors.birthDate ? (
-                      <p className={errorClassName}>{errors.birthDate}</p>
+                      <p
+                        id="add-kid-birth-date-error"
+                        role="alert"
+                        className={errorClassName}
+                      >
+                        {errors.birthDate}
+                      </p>
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -304,6 +335,10 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                         id="add-kid-room"
                         name="roomId"
                         value={roomId}
+                        aria-invalid={Boolean(errors.room)}
+                        aria-describedby={
+                          errors.room ? "add-kid-room-error" : undefined
+                        }
                         onChange={(event) => {
                           setRoomId(event.target.value);
                           setErrors((prev) => withoutError(prev, "room"));
@@ -335,15 +370,18 @@ export default function AddKidDialog({ rooms }: { rooms: RoomRecord[] }) {
                       </svg>
                     </div>
                     {errors.room ? (
-                      <p className={errorClassName}>{errors.room}</p>
+                      <p
+                        id="add-kid-room-error"
+                        role="alert"
+                        className={errorClassName}
+                      >
+                        {errors.room}
+                      </p>
                     ) : null}
                   </div>
                 </div>
 
-                <label
-                  htmlFor="add-kid-allergies"
-                  className={labelClassName}
-                >
+                <label htmlFor="add-kid-allergies" className={labelClassName}>
                   ALERGIAS (ETIQUETAS)
                 </label>
                 <input

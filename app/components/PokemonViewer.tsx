@@ -51,9 +51,13 @@ export default function PokemonViewer() {
         }
 
         const data: Pokemon = await response.json();
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setPokemon(data);
-      } catch (requestError) {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") {
+      } catch {
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -84,7 +88,10 @@ export default function PokemonViewer() {
         <p className="mb-1 text-[12.5px] font-extrabold tracking-[0.8px] text-[#D9583C]">
           POKÉMON DEL MOMENTO
         </p>
-        <h2 id="pokemon-viewer-title" className="m-0 font-display text-[22px] font-semibold text-[#3F362E]">
+        <h2
+          id="pokemon-viewer-title"
+          className="m-0 font-display text-[22px] font-semibold text-[#3F362E]"
+        >
           Descubre un Pokémon
         </h2>
       </div>
@@ -94,7 +101,9 @@ export default function PokemonViewer() {
         className="flex min-h-[230px] flex-col items-center justify-center rounded-[14px] bg-[#FBE3D8] px-4 py-5 text-center"
       >
         {isLoading ? (
-          <p className="text-[14px] font-semibold text-[#8A7C6D]">Cargando Pokémon…</p>
+          <p className="text-[14px] font-semibold text-[#8A7C6D]">
+            Cargando Pokémon…
+          </p>
         ) : error ? (
           <p role="alert" className="text-[14px] font-semibold text-[#B8432F]">
             {error}
@@ -115,7 +124,10 @@ export default function PokemonViewer() {
               {formatPokemonName(pokemon.name)}
             </h3>
             <p className="mt-1 mb-0 text-[13px] text-[#94887B]">
-              Tipo: {pokemon.types.map(({ type }) => formatPokemonName(type.name)).join(" · ")}
+              Tipo:{" "}
+              {pokemon.types
+                .map(({ type }) => formatPokemonName(type.name))
+                .join(" · ")}
             </p>
           </>
         ) : null}
@@ -124,7 +136,9 @@ export default function PokemonViewer() {
       <div className="mt-4 flex gap-3">
         <button
           type="button"
-          onClick={() => setPokemonId((currentId) => Math.max(1, currentId - 1))}
+          onClick={() =>
+            setPokemonId((currentId) => Math.max(1, currentId - 1))
+          }
           disabled={pokemonId === 1 || isLoading}
           className="flex-1 rounded-[12px] border border-[#E7DAC8] bg-white px-4 py-3 text-[14px] font-extrabold text-[#8A7C6D] transition hover:bg-[#FFF4F0] disabled:cursor-not-allowed disabled:opacity-40"
         >
