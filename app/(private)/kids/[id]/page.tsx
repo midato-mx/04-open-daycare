@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Sidebar from "@/app/components/Sidebar";
 import LinkParentDialog from "@/app/components/LinkParentDialog";
 import { getKidDetailData, toKidViewModel } from "@/app/kids/data";
 import { type KidParent } from "@/app/lib/data";
@@ -58,27 +57,22 @@ export default async function KidProfile({
 
   if (!kid) {
     return (
-      <div className="flex min-h-screen bg-[#F6ECDF]">
-        <Sidebar activeItem="kids" />
-        <main className="h-screen min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-[820px] flex-col items-center px-10 pt-[34px] pb-20">
+      <main className="h-screen min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[820px] flex-col items-center px-10 pt-[34px] pb-20">
             <h1 className="mt-24 mb-0 font-display text-[30px] font-semibold text-[#3F362E]">
               {detail.error
                 ? "No pudimos cargar la información del niño"
                 : "Niño no encontrado"}
             </h1>
             <BackToKidsLink className="mt-4" />
-          </div>
-        </main>
-      </div>
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F6ECDF]">
-      <Sidebar activeItem="kids" />
-      <main className="h-screen min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[820px] px-10 pt-[34px] pb-20">
+    <main className="h-screen min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[820px] px-10 pt-[34px] pb-20">
           <BackToKidsLink className="mb-5" />
 
           <div className="flex flex-wrap items-start gap-[26px]">
@@ -224,8 +218,7 @@ export default async function KidProfile({
               </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

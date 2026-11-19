@@ -14,13 +14,6 @@ export interface FeedPost {
   comments: number;
 }
 
-export const currentUser = {
-  name: "Caro Giménez",
-  role: "Maestra · Soles",
-  initial: "C",
-  room: "Sala Soles",
-};
-
 export const feedMeta = {
   kidsCount: 12,
   dateLabel: "martes 17 jun",

@@ -9,7 +9,10 @@ function linkedParentsLabel(count: number) {
 
 export default function KidCard({ kid }: { kid: Kid }) {
   const allergy = kid.allergy ? allergyBadges[kid.allergy] : undefined;
-  const showLinkBadge = kid.linkedParents.length === 0;
+  const linkedParentCount = kid.linkedParents.filter(
+    (parent) => parent.status === "active",
+  ).length;
+  const showLinkBadge = linkedParentCount === 0;
 
   return (
     <Link
@@ -27,7 +30,7 @@ export default function KidCard({ kid }: { kid: Kid }) {
           {kid.fullName}
         </span>
         <span className="text-[13px] text-[#A89A8B]">
-          {kid.ageLabel} · {linkedParentsLabel(kid.linkedParents.length)}
+          {kid.ageLabel} · {linkedParentsLabel(linkedParentCount)}
         </span>
       </span>
       {allergy ? (
