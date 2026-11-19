@@ -1,8 +1,11 @@
 import FeedPostCard from "@/app/components/FeedPostCard";
 import Sidebar from "@/app/components/Sidebar";
-import { currentUser, feedMeta, posts } from "@/app/lib/data";
+import { getFeedPageData } from "@/app/feed/data";
 
-export default function Home() {
+export default async function Home() {
+  const feed = await getFeedPageData();
+  const firstName = feed.profile?.full_name.split(" ")[0] ?? "familia";
+
   return (
     <div className="flex min-h-screen bg-[#F6ECDF]">
       <Sidebar activeItem="feed" />
@@ -13,40 +16,29 @@ export default function Home() {
               GUARDERÍA · SALA SOLES
             </div>
             <h1 className="m-0 font-display text-[30px] font-semibold text-[#3F362E]">
-              Buenas, {currentUser.name.split(" ")[0]}
+              Buenas, {firstName}
             </h1>
             <p className="mt-[5px] mb-0 text-[14.5px] text-[#94887B]">
-              {feedMeta.kidsCount} niños · {feedMeta.dateLabel}
+              {feed.kidsCount} niños · {feed.dateLabel}
             </p>
           </header>
 
-          <a
-            href="#"
-            className="mb-6 flex items-center gap-3.5 rounded-[18px] border border-[#ECE0D0] bg-[#FFFDF9] px-[18px] py-3.5 shadow-[0_4px_14px_-10px_rgba(120,90,60,0.4)]"
-          >
-            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#F2937A] font-display text-[16px] font-semibold text-white">
-              {currentUser.initial}
-            </span>
-            <span className="flex-1 text-[15px] text-[#A89A8B]">
-              Comparte un momento…
-            </span>
-            <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[12px] bg-[#FBE3D8] text-[#E0654A]">
-              <svg
-                width="19"
-                height="19"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-            </span>
-          </a>
+          {feed.canCompose ? (
+            <a
+              href="#"
+              className="mb-6 flex items-center gap-3.5 rounded-[18px] border border-[#ECE0D0] bg-[#FFFDF9] px-[18px] py-3.5 shadow-[0_4px_14px_-10px_rgba(120,90,60,0.4)]"
+            >
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#F2937A] font-display text-[16px] font-semibold text-white">
+                {feed.profile?.full_name.charAt(0) ?? "E"}
+              </span>
+              <span className="flex-1 text-[15px] text-[#A89A8B]">
+                Comparte un momento…
+              </span>
+              <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[12px] bg-[#FBE3D8] text-[#E0654A]">
+                <span aria-hidden="true">📷</span>
+              </span>
+            </a>
+          ) : null}
 
           <div className="mb-3.5 flex items-center gap-3.5">
             <span className="text-[12.5px] font-extrabold tracking-[0.8px] text-[#8A7C6D]">
@@ -56,9 +48,19 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-4">
-            {posts.map((post) => (
-              <FeedPostCard key={post.id} post={post} />
-            ))}
+            {feed.error ? (
+              <div className="rounded-[16px] border border-[#F0C9BE] bg-[#FFF4F0] px-5 py-4 text-[14px] text-[#B8432F]">
+                {feed.error}
+              </div>
+            ) : feed.posts.length > 0 ? (
+              feed.posts.map((post) => (
+                <FeedPostCard key={post.id} post={post} />
+              ))
+            ) : (
+              <div className="rounded-[16px] border border-dashed border-[#DBCDBA] bg-[#FFFDF9] px-5 py-8 text-center text-[14px] text-[#94887B]">
+                Todavía no hay publicaciones para mostrar.
+              </div>
+            )}
           </div>
         </div>
       </main>

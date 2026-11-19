@@ -7,11 +7,17 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { invitation, parentescoOptions } from "@/app/lib/data";
+import { inviteParent } from "@/app/kids/actions";
+import { parentescoOptions } from "@/app/lib/data";
 
 type Parentesco = (typeof parentescoOptions)[number];
 
-type FieldErrors = { fullName?: string; email?: string; parentesco?: string };
+type FieldErrors = {
+  fullName?: string;
+  email?: string;
+  parentesco?: string;
+  form?: string;
+};
 
 const labelClassName =
   "mb-2 block text-[12px] font-extrabold tracking-[0.7px] text-[#94887B]";
@@ -51,14 +57,18 @@ function validateEmail(value: string): string | undefined {
 
 export default function LinkParentDialog({
   kidFullName,
+  childId,
 }: {
   kidFullName: string;
+  childId: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [parentesco, setParentesco] = useState<Parentesco | "">("");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sentInvitationId, setSentInvitationId] = useState<string | null>(null);
   const fullNameInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = useCallback(() => {
@@ -66,6 +76,8 @@ export default function LinkParentDialog({
     setEmail("");
     setParentesco("");
     setErrors({});
+    setIsSubmitting(false);
+    setSentInvitationId(null);
   }, []);
 
   const closeModal = useCallback(() => {
@@ -73,7 +85,7 @@ export default function LinkParentDialog({
     resetForm();
   }, [resetForm]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors: FieldErrors = {};
@@ -95,7 +107,25 @@ export default function LinkParentDialog({
       return;
     }
 
-    closeModal();
+    setIsSubmitting(true);
+    setErrors({});
+    try {
+      const result = await inviteParent({
+        fullName,
+        email,
+        relationship: parentesco,
+        childId,
+      });
+
+      if (!result.ok) {
+        setErrors({ form: result.message });
+        return;
+      }
+
+      setSentInvitationId(result.invitationId);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -184,8 +214,43 @@ export default function LinkParentDialog({
               </button>
             </div>
 
-            <form noValidate onSubmit={handleSubmit}>
-              <div className="px-[26px] py-[22px]">
+            {sentInvitationId ? (
+              <div className="px-[26px] py-[28px]">
+                <div className="flex flex-col items-center text-center">
+                  <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#CFEBD8] text-[#3E9B6C]">
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m5 12 4 4L19 6" />
+                    </svg>
+                  </span>
+                  <h2 className="m-0 font-display text-[20px] font-semibold text-[#3F362E]">
+                    Invitación enviada
+                  </h2>
+                  <p className="mt-2 mb-0 max-w-[320px] text-[14px] leading-relaxed text-[#94887B]">
+                    Enviamos las instrucciones a <strong>{email}</strong>.
+                    La invitación vence en 24 horas.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="mt-6 rounded-[14px] border-none bg-[#3F362E] px-6 py-3 text-[15px] font-extrabold text-white"
+                  >
+                    Listo
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form noValidate onSubmit={handleSubmit}>
+                <div className="px-[26px] py-[22px]">
                 <div className="mb-5 flex gap-[11px] rounded-[14px] bg-[#E3ECFB] px-4 py-[13px]">
                   <svg
                     width="20"
@@ -284,45 +349,64 @@ export default function LinkParentDialog({
                       </button>
                     ))}
                   </div>
-                  {errors.parentesco ? (
+                 {errors.parentesco ? (
                     <p className={errorClassName}>{errors.parentesco}</p>
                   ) : null}
                 </div>
+
+                {errors.form ? (
+                  <p className={`mb-5 ${errorClassName}`}>{errors.form}</p>
+                ) : null}
 
                 <div className="mb-5 rounded-[16px] border-[1.5px] border-dashed border-[#E6D08A] bg-[#FBF1D6] py-[18px] text-center">
                   <div className="mb-2 text-[12px] font-extrabold tracking-[0.7px] text-[#A88526]">
                     CÓDIGO DE INVITACIÓN
                   </div>
-                  <div className="font-display text-[34px] font-semibold tracking-[7px] text-[#8A7234]">
-                    {invitation.code}
+                  <div className="font-display text-[24px] font-semibold tracking-[2px] text-[#8A7234]">
+                    Se generará al enviar
                   </div>
                   <div className="mt-[6px] text-[13px] text-[#A88526]">
-                    Vence en 7 días
+                    Válido durante 24 horas
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="flex w-full cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-none bg-[linear-gradient(180deg,#F4977E,#EE8164)] py-[14px] text-[15.5px] font-extrabold text-white shadow-[0_10px_22px_-8px_rgba(238,129,100,0.7)]"
+                  disabled={isSubmitting}
+                  aria-busy={isSubmitting}
+                  className="flex w-full cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-none bg-[linear-gradient(180deg,#F4977E,#EE8164)] py-[14px] text-[15.5px] font-extrabold text-white shadow-[0_10px_22px_-8px_rgba(238,129,100,0.7)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <svg
-                    width="19"
-                    height="19"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#fff"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m22 2-7 20-4-9-9-4z" />
-                    <path d="M22 2 11 13" />
-                  </svg>
-                  Enviar invitación
+                  {isSubmitting ? (
+                    <>
+                      <span
+                        className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white border-t-transparent"
+                        aria-hidden="true"
+                      />
+                      Enviando…
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        width="19"
+                        height="19"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#fff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="m22 2-7 20-4-9-9-4z" />
+                        <path d="M22 2 11 13" />
+                      </svg>
+                      Enviar invitación
+                    </>
+                  )}
                 </button>
-              </div>
-            </form>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       ) : null}

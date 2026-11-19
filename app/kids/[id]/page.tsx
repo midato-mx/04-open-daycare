@@ -50,7 +50,10 @@ export default async function KidProfile({
   const detail = await getKidDetailData(id);
   const kid =
     detail.child && detail.room
-      ? toKidViewModel(detail.child, detail.room.name, 0)
+      ? {
+          ...toKidViewModel(detail.child, detail.room.name, 0),
+          linkedParents: detail.linkedParents,
+        }
       : null;
 
   if (!kid) {
@@ -213,7 +216,10 @@ export default async function KidProfile({
                       </div>
                     );
                   })}
-                  <LinkParentDialog kidFullName={kid.fullName} />
+                  <LinkParentDialog
+                    childId={kid.id}
+                    kidFullName={kid.fullName}
+                  />
                 </div>
               </div>
             </div>
