@@ -1,4 +1,5 @@
 import FeedPostCard from "@/app/components/FeedPostCard";
+import PokemonViewer from "@/app/components/PokemonViewer";
 import { getFeedPageData } from "@/app/feed/data";
 
 export default async function Home() {
@@ -19,6 +20,8 @@ export default async function Home() {
               {feed.kidsCount} niños · {feed.dateLabel}
             </p>
         </header>
+
+        <PokemonViewer />
 
         {feed.canCompose ? (
             <a
