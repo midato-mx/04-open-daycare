@@ -1,4 +1,18 @@
-export type PostType = "achievement" | "activity" | "announcement";
+export type PostType =
+  | "meal"
+  | "nap"
+  | "activity"
+  | "achievement"
+  | "mood"
+  | "photo"
+  | "announcement";
+
+export type FeedPhoto = {
+  id: string;
+  url: string;
+  alt: string;
+  storagePath: string;
+};
 
 export interface FeedPost {
   id: string;
@@ -8,8 +22,12 @@ export interface FeedPost {
   time: string;
   publishedBy: string;
   audience: string;
+  roomId: string | null;
+  childIds: string[];
   body: string;
   photoLabel?: string;
+  photos: FeedPhoto[];
+  isAuthor: boolean;
   likes: number;
   comments: number;
 }
@@ -343,7 +361,11 @@ export const posts: FeedPost[] = [
     time: "14:20",
     publishedBy: "publicado por vos",
     audience: "Para: familia de Mateo",
+    roomId: null,
+    childIds: [],
     body: "¡Usó el orinal solito por primera vez! Estaba feliz de contárselo a todos. Un gran paso.",
+    photos: [],
+    isAuthor: false,
     likes: 3,
     comments: 1,
   },
@@ -355,8 +377,11 @@ export const posts: FeedPost[] = [
     time: "09:40",
     publishedBy: "publicado por vos",
     audience: "Para: familia de Mateo",
+    roomId: null,
+    childIds: [],
     body: "Pintamos con témperas esta mañana. Mateo eligió el azul para todo y se concentró un montón mezclando colores.",
-    photoLabel: "Foto · pintando con témperas",
+    photos: [],
+    isAuthor: false,
     likes: 5,
     comments: 2,
   },
@@ -367,7 +392,11 @@ export const posts: FeedPost[] = [
     time: "07:50",
     publishedBy: "publicado por vos",
     audience: "Para: toda la sala",
+    roomId: null,
+    childIds: [],
     body: "El viernes salimos al parque por la mañana. Recuerden mandar gorra y una botellita de agua.",
+    photos: [],
+    isAuthor: false,
     likes: 8,
     comments: 0,
   },

@@ -14,6 +14,10 @@
       "description": "Crea especificaciones de pantallas y funcionalidades",
       "template": "Carga y sigue la skill spec en .agents/skills/spec/SKILL.md.\n\nFeature: $ARGUMENTS"
     },
+    "grilling": {
+      "description": "Entrevista y cuestiona a fondo un plan o diseño",
+      "template": "Carga y sigue la skill grill-me en .agents/skills/grill-me/SKILL.md.\n\nTema o plan: $ARGUMENTS"
+    },
     "spec-impl": {
       "description": "Implementa especificaciones de pantallas y funcionalidades",
       "template": "Carga y sigue la skill spec-impl en .agents/skills/spec-impl/SKILL.md.\n\nFeature: $ARGUMENTS"

@@ -61,7 +61,9 @@ export default function Sidebar({
         </span>
       </Link>
 
-      <CreatePostDialog />
+      {profile && (profile.role === "staff" || profile.role === "admin") ? (
+        <CreatePostDialog />
+      ) : null}
 
       <nav className="flex flex-1 flex-col gap-1">
         <Link

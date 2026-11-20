@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import DeletePostDialog from "@/app/components/DeletePostDialog";
 import type { FeedPost, PostType } from "@/app/lib/data";
 
 type FeedPostCardProps = Readonly<{
@@ -10,13 +14,18 @@ type Badge = {
 };
 
 const BADGE: Record<PostType, Badge> = {
+  meal: { label: "COMIDA", colors: "bg-[#F4DC8E] text-[#9A7B1E]" },
+  nap: { label: "SIESTA", colors: "bg-[#E7DCF6] text-[#7B5FC0]" },
   achievement: { label: "LOGRO", colors: "bg-[#CFEBD8] text-[#3E9B6C]" },
   activity: { label: "ACTIVIDAD", colors: "bg-[#C7E7F1] text-[#2E89A6]" },
+  mood: { label: "ÁNIMO", colors: "bg-[#F9D2DE] text-[#C56486]" },
+  photo: { label: "FOTO", colors: "bg-[#FBD8CC] text-[#D9684A]" },
   announcement: { label: "ANUNCIO", colors: "bg-[#CCD8F4] text-[#4E72C8]" },
 };
 
 export default function FeedPostCard({ post }: FeedPostCardProps) {
   const badge = BADGE[post.type];
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   return (
     <article className="rounded-[20px] border border-[#ECE0D0] bg-[#FFFDF9] px-[22px] py-5 shadow-[0_4px_16px_-12px_rgba(120,90,60,0.5)]">
@@ -65,28 +74,28 @@ export default function FeedPostCard({ post }: FeedPostCardProps) {
         {post.body}
       </p>
 
-      {post.photoLabel && (
+      {post.photos.length > 0 && (
         <div
-          role="img"
-          aria-label={post.photoLabel}
-          className="mt-3.5 flex h-[200px] flex-col items-center justify-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[#DBCDBA] bg-[#F4ECE1] text-[#B0A290]"
+          className={`mt-3.5 grid gap-2 overflow-hidden rounded-[16px] ${
+            post.photos.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          }`}
+          aria-label={`${post.photos.length} ${
+            post.photos.length === 1 ? "fotografía" : "fotografías"
+          }`}
         >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21" />
-          </svg>
-          <span className="text-[13.5px]">{post.photoLabel}</span>
+          {post.photos.map((photo) => (
+            // Signed URLs are generated server-side and are intentionally not
+            // passed through next/image's public image configuration.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.id}
+              src={photo.url}
+              alt={photo.alt}
+              className={`h-[200px] w-full object-cover ${
+                post.photos.length > 2 ? "max-h-[180px]" : ""
+              }`}
+            />
+          ))}
         </div>
       )}
 
@@ -124,10 +133,38 @@ export default function FeedPostCard({ post }: FeedPostCardProps) {
           {post.comments}
         </span>
         <span className="flex-1" />
-        <span className="text-[14px] font-extrabold text-[#C5503A]">
-          Editar
-        </span>
+        {post.isAuthor ? (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("opendaycare:open-create-post", {
+                    detail: { post },
+                  }),
+                )
+              }
+              className="cursor-pointer border-none bg-transparent p-0 text-[14px] font-extrabold text-[#C5503A]"
+              data-post-action="edit"
+              data-post-id={post.id}
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="cursor-pointer border-none bg-transparent p-0 text-[14px] font-extrabold text-[#94887B]"
+            >
+              Eliminar
+            </button>
+          </>
+        ) : null}
       </div>
+      <DeletePostDialog
+        postId={post.id}
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+      />
     </article>
   );
 }
