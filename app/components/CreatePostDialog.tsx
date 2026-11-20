@@ -7,32 +7,42 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { kids } from "@/app/lib/data";
+import {
+  createPost,
+  getPublishableRooms,
+  type PostDraft,
+  updatePost,
+  type PublishableRoom,
+  type PostType,
+} from "@/app/feed/actions";
+import type { FeedPost } from "@/app/lib/data";
 
 type FieldErrors = {
+  room?: string;
   recipients?: string;
   postType?: string;
   description?: string;
+  photos?: string;
 };
 
 interface PhotoPreview {
   id: string;
-  file: File;
+  file?: File;
   url: string;
+  storagePath?: string;
 }
 
 type PostTypeKey =
-  | "comida"
-  | "siesta"
-  | "actividad"
-  | "logro"
-  | "animo"
-  | "foto"
-  | "anuncio";
+  "comida" | "siesta" | "actividad" | "logro" | "animo" | "foto" | "anuncio";
 
 const FIRST_VISIBLE_KIDS = 3;
 
-const postTypeOptions: { key: PostTypeKey; label: string; bg: string; fg: string }[] = [
+const postTypeOptions: {
+  key: PostTypeKey;
+  label: string;
+  bg: string;
+  fg: string;
+}[] = [
   { key: "comida", label: "Comida", bg: "#9A7B1E", fg: "#FFFFFF" },
   { key: "siesta", label: "Siesta", bg: "#E7DCF6", fg: "#7B5FC0" },
   { key: "actividad", label: "Actividad", bg: "#2E89A6", fg: "#FFFFFF" },
@@ -45,6 +55,12 @@ const postTypeOptions: { key: PostTypeKey; label: string; bg: string; fg: string
 const sectionLabelClassName =
   "mb-[10px] block text-[12px] font-extrabold tracking-[0.7px] text-[#94887B]";
 const errorClassName = "mt-[6px] text-[12.5px] font-bold text-[#D9583C]";
+const dialogTitleId = "create-post-dialog-title";
+const recipientsErrorId = "create-post-recipients-error";
+const postTypeErrorId = "create-post-type-error";
+const descriptionErrorId = "create-post-description-error";
+const roomErrorId = "create-post-room-error";
+const photosErrorId = "create-post-photos-error";
 
 function withoutError(errors: FieldErrors, field: keyof FieldErrors) {
   if (!errors[field]) {
@@ -67,8 +83,22 @@ function attendeeChipClassName(isSelected: boolean) {
   }`;
 }
 
-export default function CreatePostDialog() {
-  const [isOpen, setIsOpen] = useState(false);
+export type CreatePostDialogProps = Readonly<{
+  initialPost?: FeedPost | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}>;
+
+export default function CreatePostDialog({
+  initialPost = null,
+  open,
+  onOpenChange,
+  hideTrigger = false,
+}: CreatePostDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [rooms, setRooms] = useState<PublishableRoom[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedKidIds, setSelectedKidIds] = useState<string[]>([]);
   const [allRoom, setAllRoom] = useState(false);
   const [selectedType, setSelectedType] = useState<PostTypeKey | null>(null);
@@ -76,9 +106,27 @@ export default function CreatePostDialog() {
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [showAllKids, setShowAllKids] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [hasLoadedRooms, setHasLoadedRooms] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [removedPhotoPaths, setRemovedPhotoPaths] = useState<string[]>([]);
+  const [externalPost, setExternalPost] = useState<FeedPost | null>(null);
   const firstChipRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<PhotoPreview[]>([]);
+  const isOpen = open ?? internalOpen;
+  const activePost = initialPost ?? externalPost;
+  const isEditing = Boolean(activePost);
+
+  const setDialogOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (open === undefined) {
+        setInternalOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [onOpenChange, open],
+  );
 
   useEffect(() => {
     photosRef.current = photos;
@@ -92,6 +140,7 @@ export default function CreatePostDialog() {
   );
 
   const resetForm = useCallback(() => {
+    setSelectedRoomId("");
     setSelectedKidIds([]);
     setAllRoom(false);
     setSelectedType(null);
@@ -100,18 +149,98 @@ export default function CreatePostDialog() {
     setPhotos([]);
     setShowAllKids(false);
     setErrors({});
+    setOperationError(null);
+    setRemovedPhotoPaths([]);
   }, []);
 
   const closeModal = useCallback(() => {
-    setIsOpen(false);
+    setDialogOpen(false);
+    setExternalPost(null);
     resetForm();
-  }, [resetForm]);
+  }, [resetForm, setDialogOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !activePost) {
+      return;
+    }
+    // The form mirrors the selected post when the parent opens edit mode.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDescription(activePost.body);
+    setSelectedRoomId(activePost.roomId ?? "");
+    setSelectedKidIds(activePost.childIds);
+    setAllRoom(activePost.type === "announcement");
+    setSelectedType(
+      activePost.type === "announcement"
+        ? "anuncio"
+        : ({
+            meal: "comida",
+            nap: "siesta",
+            activity: "actividad",
+            achievement: "logro",
+            mood: "animo",
+            photo: "foto",
+            announcement: "anuncio",
+          }[activePost.type] as PostTypeKey),
+    );
+    setPhotos(
+      activePost.photos.map((photo) => ({
+        id: photo.id,
+        url: photo.url,
+        storagePath: photo.storagePath,
+      })),
+    );
+    setRemovedPhotoPaths([]);
+  }, [activePost, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
       firstChipRef.current?.focus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const handleExternalOpen = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        focusFiles?: boolean;
+        post?: FeedPost;
+      }>;
+      setExternalPost(customEvent.detail?.post ?? null);
+      setDialogOpen(true);
+      if (customEvent.detail?.focusFiles) {
+        window.setTimeout(() => fileInputRef.current?.click(), 0);
+      }
+    };
+
+    window.addEventListener("opendaycare:open-create-post", handleExternalOpen);
+    return () =>
+      window.removeEventListener(
+        "opendaycare:open-create-post",
+        handleExternalOpen,
+      );
+  }, [setDialogOpen]);
+
+  useEffect(() => {
+    if (!isOpen || hasLoadedRooms) {
+      return;
+    }
+
+    let isCurrent = true;
+    void getPublishableRooms().then((result) => {
+      if (!isCurrent) {
+        return;
+      }
+      setHasLoadedRooms(true);
+      if (result.ok) {
+        setRooms(result.data);
+      } else {
+        setOperationError(result.error);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [hasLoadedRooms, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -139,6 +268,9 @@ export default function CreatePostDialog() {
   const toggleAllRoom = () => {
     setAllRoom((previous) => !previous);
     setSelectedKidIds((previous) => (previous.length > 0 ? [] : previous));
+    setSelectedType((previous) =>
+      !allRoom ? "anuncio" : previous === "anuncio" ? null : previous,
+    );
     setErrors((previous) => withoutError(previous, "recipients"));
   };
 
@@ -153,28 +285,67 @@ export default function CreatePostDialog() {
     if (!files) {
       return;
     }
-    const previews = Array.from(files).map((file) => ({
+    const nextFiles = Array.from(files);
+    const invalidPhoto = nextFiles.find(
+      (file) =>
+        !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+        file.size <= 0 ||
+        file.size > 10 * 1024 * 1024,
+    );
+    if (invalidPhoto) {
+      setErrors((previous) => ({
+        ...previous,
+        photos: !["image/jpeg", "image/png", "image/webp"].includes(
+          invalidPhoto.type,
+        )
+          ? "Solo se aceptan imágenes JPG, PNG o WebP."
+          : "Cada imagen debe pesar máximo 10 MB.",
+      }));
+      return;
+    }
+    if (photos.length + nextFiles.length > 10) {
+      setErrors((previous) => ({
+        ...previous,
+        photos: "Puedes agregar hasta 10 imágenes por publicación.",
+      }));
+      return;
+    }
+    const previews = nextFiles.map((file) => ({
       id: crypto.randomUUID(),
       file,
       url: URL.createObjectURL(file),
     }));
     setPhotos((previous) => [...previous, ...previews]);
+    setErrors((previous) => withoutError(previous, "photos"));
   };
 
   const removePhoto = (photoId: string) => {
     setPhotos((previous) => {
       const target = previous.find((photo) => photo.id === photoId);
-      if (target) {
+      if (target?.storagePath) {
+        setRemovedPhotoPaths((paths) =>
+          paths.includes(target.storagePath as string)
+            ? paths
+            : [...paths, target.storagePath as string],
+        );
+      }
+      if (target?.file) {
         URL.revokeObjectURL(target.url);
       }
       return previous.filter((photo) => photo.id !== photoId);
     });
   };
 
-  const handlePublish = (event: FormEvent<HTMLFormElement>) => {
+  const handlePublish = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isPublishing) {
+      return;
+    }
 
     const nextErrors: FieldErrors = {};
+    if (!selectedRoomId) {
+      nextErrors.room = "Selecciona una sala.";
+    }
     if (!allRoom && selectedKidIds.length === 0) {
       nextErrors.recipients = "Selecciona al menos un destinatario.";
     }
@@ -184,9 +355,66 @@ export default function CreatePostDialog() {
     if (!description.trim()) {
       nextErrors.description = "Escribe la descripción.";
     }
+    if (errors.photos) {
+      nextErrors.photos = errors.photos;
+    }
     setErrors(nextErrors);
+    if (
+      Object.keys(nextErrors).length > 0 ||
+      !selectedRoomId ||
+      !selectedType
+    ) {
+      return;
+    }
+
+    const selectedRoom = rooms.find((room) => room.id === selectedRoomId);
+    if (!selectedRoom) {
+      setErrors({ room: "La sala seleccionada ya no está disponible." });
+      return;
+    }
+
+    setIsPublishing(true);
+    setOperationError(null);
+    const postTypeMap: Record<PostTypeKey, PostType> = {
+      comida: "meal",
+      siesta: "nap",
+      actividad: "activity",
+      logro: "achievement",
+      animo: "mood",
+      foto: "photo",
+      anuncio: "announcement",
+    };
+    const postDraft: PostDraft = {
+      audience: allRoom
+        ? { kind: "room", roomId: selectedRoom.id }
+        : {
+            kind: "children",
+            roomId: selectedRoom.id,
+            childIds: selectedKidIds,
+          },
+      type: postTypeMap[selectedType],
+      body: description,
+      photos: photos
+        .map((photo) => photo.file)
+        .filter((file): file is File => Boolean(file)),
+    };
+    const result =
+      isEditing && activePost
+        ? await updatePost(activePost.id, postDraft, removedPhotoPaths)
+        : await createPost(postDraft);
+    setIsPublishing(false);
+
+    if (!result.ok) {
+      setOperationError(result.error);
+      return;
+    }
+
+    closeModal();
   };
 
+  const selectedRoom = rooms.find((room) => room.id === selectedRoomId);
+  const kids = selectedRoom?.children ?? [];
+  const isLoadingRooms = isOpen && !hasLoadedRooms;
   const visibleKids = showAllKids
     ? kids
     : kids.filter(
@@ -197,26 +425,28 @@ export default function CreatePostDialog() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="mb-[18px] flex w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(180deg,#F4977E,#EE8164)] p-3 text-[14.5px] font-extrabold text-white shadow-[0_8px_18px_-8px_rgba(238,129,100,0.75)]"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#fff"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+      {!hideTrigger ? (
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          className="mb-[18px] flex w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(180deg,#F4977E,#EE8164)] p-3 text-[14.5px] font-extrabold text-white shadow-[0_8px_18px_-8px_rgba(238,129,100,0.75)]"
         >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Nueva publicación
-      </button>
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nueva publicación
+        </button>
+      ) : null}
 
       {isOpen ? (
         <div
@@ -224,243 +454,353 @@ export default function CreatePostDialog() {
           onClick={closeModal}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
             className="h-fit w-full max-w-[580px] overflow-hidden rounded-[24px] border border-[#ECE0D0] bg-[#FBF4EC] shadow-[0_20px_50px_-24px_rgba(63,54,46,0.35)]"
             onClick={(event) => event.stopPropagation()}
           >
             <form onSubmit={handlePublish}>
               <div className="flex items-center justify-between border-b border-[#ECE0D0] px-[26px] py-5">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="cursor-pointer border-none bg-transparent p-0 text-[15px] font-bold text-[#94887B]"
-              >
-                Cancelar
-              </button>
-              <span className="font-display text-[18px] font-semibold text-[#3F362E]">
-                Nueva publicación
-              </span>
-              <button
-                type="submit"
-                className="cursor-pointer border-none bg-transparent p-0 text-[15px] font-extrabold text-[#D9583C]"
-              >
-                Publicar
-              </button>
-            </div>
-            <div className="px-[26px] py-6">
-              <div className={sectionLabelClassName}>PARA</div>
-              <div
-                className={`flex flex-wrap items-center gap-[9px] ${
-                  errors.recipients
-                    ? "mb-[6px] rounded-[14px] border-[1.5px] border-[#D9583C] p-[10px]"
-                    : "mb-[22px]"
-                }`}
-              >
-                {visibleKids.map((kid, index) => {
-                  const isSelected = selectedKidIds.includes(kid.id);
-                  return (
-                    <button
-                      key={kid.id}
-                      ref={index === 0 ? firstChipRef : undefined}
-                      type="button"
-                      onClick={() => toggleKidSelection(kid.id)}
-                      className={`${attendeeChipClassName(isSelected)} py-[6px] pl-[6px] pr-[14px]`}
-                    >
-                      <span
-                        className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full font-display text-[13px] font-semibold"
-                        style={{ backgroundColor: kid.avatarBg, color: kid.avatarFg }}
-                      >
-                        {kid.initial}
-                      </span>
-                      {kid.fullName.split(" ")[0]}
-                    </button>
-                  );
-                })}
                 <button
                   type="button"
-                  onClick={toggleAllRoom}
-                  className={`${attendeeChipClassName(allRoom)} px-[16px]`}
+                  onClick={closeModal}
+                  className="cursor-pointer border-none bg-transparent p-0 text-[15px] font-bold text-[#94887B]"
                 >
-                  Toda la sala
+                  Cancelar
                 </button>
-                {showAllKids ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllKids(false)}
-                    className="flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] border-[#ECE0D0] bg-[#FFFDF9] px-[16px] py-[6px] text-[14px] font-bold text-[#6E6359]"
-                  >
-                    Mostrar menos
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#B0A290"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m18 15-6-6-6 6" />
-                    </svg>
-                  </button>
-                ) : hiddenUnselectedCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllKids(true)}
-                    className="flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] border-[#ECE0D0] bg-[#FFFDF9] px-[16px] py-[6px] text-[14px] font-bold text-[#6E6359]"
-                  >
-                    +{hiddenUnselectedCount}
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#B0A290"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
-                ) : null}
+                <span
+                  id={dialogTitleId}
+                  className="font-display text-[18px] font-semibold text-[#3F362E]"
+                >
+                  {isEditing ? "Editar publicación" : "Nueva publicación"}
+                </span>
+                <button
+                  type="submit"
+                  disabled={isPublishing || isLoadingRooms}
+                  className="cursor-pointer border-none bg-transparent p-0 text-[15px] font-extrabold text-[#D9583C]"
+                >
+                  {isPublishing ? "Publicando…" : "Publicar"}
+                </button>
               </div>
-              {errors.recipients ? (
-                <p className={errorClassName}>{errors.recipients}</p>
-              ) : null}
-
-              <div className={sectionLabelClassName}>TIPO</div>
-              <div
-                className={`flex flex-wrap items-center gap-[9px] ${
-                  errors.postType
-                    ? "mb-[6px] rounded-[14px] border-[1.5px] border-[#D9583C] p-[10px]"
-                    : "mb-[22px]"
-                }`}
-              >
-                {postTypeOptions.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => togglePostType(option.key)}
-                    style={{ backgroundColor: option.bg, color: option.fg }}
-                    className={`cursor-pointer rounded-full border-none px-[16px] py-[8px] text-[13.5px] font-extrabold ring-offset-2 ring-offset-[#FBF4EC] ${
-                      selectedType === option.key
-                        ? "ring-[3px] ring-[#3F362E]"
-                        : "ring-0"
-                    }`}
+              <div className="px-[26px] py-6">
+                <label
+                  htmlFor="create-post-room"
+                  className={sectionLabelClassName}
+                >
+                  SALA
+                </label>
+                <select
+                  id="create-post-room"
+                  value={selectedRoomId}
+                  disabled={isLoadingRooms || isPublishing}
+                  onChange={(event) => {
+                    setSelectedRoomId(event.target.value);
+                    setSelectedKidIds([]);
+                    setAllRoom(false);
+                    setShowAllKids(false);
+                    setErrors((previous) => withoutError(previous, "room"));
+                    setErrors((previous) =>
+                      withoutError(previous, "recipients"),
+                    );
+                  }}
+                  aria-invalid={Boolean(errors.room)}
+                  aria-describedby={errors.room ? roomErrorId : undefined}
+                  className={`mb-[22px] w-full rounded-[14px] border-[1.5px] bg-white px-4 py-3 text-[14px] text-[#3F362E] outline-none ${fieldBorder(Boolean(errors.room))}`}
+                >
+                  <option value="">
+                    {isLoadingRooms ? "Cargando salas…" : "Selecciona una sala"}
+                  </option>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.room ? (
+                  <p
+                    id={roomErrorId}
+                    className={`${errorClassName} mb-4`}
+                    role="alert"
                   >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {errors.postType ? (
-                <p className={errorClassName}>{errors.postType}</p>
-              ) : null}
-
-              <div className={sectionLabelClassName}>DESCRIPCIÓN</div>
-              <textarea
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  setErrors((previous) =>
-                    withoutError(previous, "description"),
-                  );
-                }}
-                placeholder="Cuenta cómo le fue hoy…"
-                className={`min-h-[120px] w-full resize-y rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] leading-[1.5] text-[#3F362E] outline-none placeholder:text-[#B6A99B] ${fieldBorder(Boolean(errors.description))} ${
-                  errors.description ? "mb-[6px]" : "mb-[22px]"
-                }`}
-              />
-              {errors.description ? (
-                <p className={errorClassName}>{errors.description}</p>
-              ) : null}
-
-              <div className={sectionLabelClassName}>FOTOS</div>
-              <div className="flex flex-wrap gap-[12px]">
-                {photos.length === 0 ? (
-                  <div className="flex h-[96px] w-[96px] flex-none items-center justify-center rounded-[14px] border border-[#ECE0D0] bg-[#F4ECE1] text-[#CBB89F]">
-                    <svg
-                      width="26"
-                      height="26"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="9" cy="9" r="2" />
-                      <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21" />
-                    </svg>
-                  </div>
+                    {errors.room}
+                  </p>
                 ) : null}
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    className="relative h-[96px] w-[96px] flex-none overflow-hidden rounded-[14px] border border-[#ECE0D0]"
+                {operationError ? (
+                  <p className={`${errorClassName} mb-4`} role="alert">
+                    {operationError}
+                  </p>
+                ) : null}
+                <div className={sectionLabelClassName}>PARA</div>
+                <div
+                  className={`flex flex-wrap items-center gap-[9px] ${
+                    errors.recipients
+                      ? "mb-[6px] rounded-[14px] border-[1.5px] border-[#D9583C] p-[10px]"
+                      : "mb-[22px]"
+                  }`}
+                  role="group"
+                  aria-label="Destinatarios"
+                  aria-describedby={
+                    errors.recipients ? recipientsErrorId : undefined
+                  }
+                >
+                  {visibleKids.map((kid, index) => {
+                    const isSelected = selectedKidIds.includes(kid.id);
+                    return (
+                      <button
+                        key={kid.id}
+                        ref={index === 0 ? firstChipRef : undefined}
+                        type="button"
+                        onClick={() => toggleKidSelection(kid.id)}
+                        disabled={isPublishing}
+                        aria-pressed={isSelected}
+                        className={`${attendeeChipClassName(isSelected)} py-[6px] pl-[6px] pr-[14px]`}
+                      >
+                        <span
+                          className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full font-display text-[13px] font-semibold"
+                          style={{
+                            backgroundColor: "#A9D9E8",
+                            color: "#1F7A93",
+                          }}
+                        >
+                          {kid.fullName.charAt(0).toUpperCase()}
+                        </span>
+                        {kid.fullName.split(" ")[0]}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={toggleAllRoom}
+                    disabled={isPublishing}
+                    aria-pressed={allRoom}
+                    className={`${attendeeChipClassName(allRoom)} px-[16px]`}
                   >
-                    <img
-                      src={photo.url}
-                      alt={photo.file.name}
-                      className="h-full w-full object-cover"
-                    />
+                    Toda la sala
+                  </button>
+                  {showAllKids ? (
                     <button
                       type="button"
-                      aria-label="Quitar foto"
-                      onClick={() => removePhoto(photo.id)}
-                      className="absolute right-[6px] top-[6px] flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-full border border-[#ECE0D0] bg-[#FFFDF9]"
+                      onClick={() => setShowAllKids(false)}
+                      disabled={isPublishing}
+                      className="flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] border-[#ECE0D0] bg-[#FFFDF9] px-[16px] py-[6px] text-[14px] font-bold text-[#6E6359]"
                     >
+                      Mostrar menos
                       <svg
-                        width="12"
-                        height="12"
+                        width="14"
+                        height="14"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#C5503A"
-                        strokeWidth="2.4"
+                        stroke="#B0A290"
+                        strokeWidth="2.2"
                         strokeLinecap="round"
+                        strokeLinejoin="round"
                         aria-hidden="true"
                       >
-                        <path d="M18 6 6 18M6 6l12 12" />
+                        <path d="m18 15-6-6-6 6" />
                       </svg>
                     </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[96px] w-[96px] flex-none cursor-pointer flex-col items-center justify-center gap-[6px] rounded-[14px] border-[1.5px] border-dashed border-[#DBCDBA] bg-[#F4ECE1] text-[12px] text-[#B0A290]"
-                >
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#C5503A"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                  ) : hiddenUnselectedCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllKids(true)}
+                      disabled={isPublishing}
+                      className="flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] border-[#ECE0D0] bg-[#FFFDF9] px-[16px] py-[6px] text-[14px] font-bold text-[#6E6359]"
+                    >
+                      +{hiddenUnselectedCount}
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#B0A290"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
+                {errors.recipients ? (
+                  <p
+                    id={recipientsErrorId}
+                    className={errorClassName}
+                    role="alert"
                   >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Agregar
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
+                    {errors.recipients}
+                  </p>
+                ) : null}
+
+                <div className={sectionLabelClassName}>TIPO</div>
+                <div
+                  className={`flex flex-wrap items-center gap-[9px] ${
+                    errors.postType
+                      ? "mb-[6px] rounded-[14px] border-[1.5px] border-[#D9583C] p-[10px]"
+                      : "mb-[22px]"
+                  }`}
+                  role="group"
+                  aria-label="Tipo de publicación"
+                  aria-describedby={
+                    errors.postType ? postTypeErrorId : undefined
+                  }
+                >
+                  {postTypeOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => togglePostType(option.key)}
+                      disabled={
+                        isPublishing || (allRoom && option.key !== "anuncio")
+                      }
+                      aria-pressed={selectedType === option.key}
+                      style={{ backgroundColor: option.bg, color: option.fg }}
+                      className={`cursor-pointer rounded-full border-none px-[16px] py-[8px] text-[13.5px] font-extrabold ring-offset-2 ring-offset-[#FBF4EC] ${
+                        selectedType === option.key
+                          ? "ring-[3px] ring-[#3F362E]"
+                          : "ring-0"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {errors.postType ? (
+                  <p
+                    id={postTypeErrorId}
+                    className={errorClassName}
+                    role="alert"
+                  >
+                    {errors.postType}
+                  </p>
+                ) : null}
+
+                <div className={sectionLabelClassName}>DESCRIPCIÓN</div>
+                <textarea
+                  value={description}
                   onChange={(event) => {
-                    addPhotos(event.target.files);
-                    event.target.value = "";
+                    setDescription(event.target.value);
+                    setErrors((previous) =>
+                      withoutError(previous, "description"),
+                    );
                   }}
+                  aria-invalid={Boolean(errors.description)}
+                  aria-describedby={
+                    errors.description ? descriptionErrorId : undefined
+                  }
+                  placeholder="Cuenta cómo le fue hoy…"
+                  className={`min-h-[120px] w-full resize-y rounded-[14px] border-[1.5px] bg-white px-4 py-[14px] text-[15px] leading-[1.5] text-[#3F362E] outline-none placeholder:text-[#B6A99B] ${fieldBorder(Boolean(errors.description))} ${
+                    errors.description ? "mb-[6px]" : "mb-[22px]"
+                  }`}
                 />
+                {errors.description ? (
+                  <p
+                    id={descriptionErrorId}
+                    className={errorClassName}
+                    role="alert"
+                  >
+                    {errors.description}
+                  </p>
+                ) : null}
+
+                <div className={sectionLabelClassName}>FOTOS</div>
+                <div className="flex flex-wrap gap-[12px]">
+                  {photos.length === 0 ? (
+                    <div className="flex h-[96px] w-[96px] flex-none items-center justify-center rounded-[14px] border border-[#ECE0D0] bg-[#F4ECE1] text-[#CBB89F]">
+                      <svg
+                        width="26"
+                        height="26"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="9" cy="9" r="2" />
+                        <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21" />
+                      </svg>
+                    </div>
+                  ) : null}
+                  {photos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="relative h-[96px] w-[96px] flex-none overflow-hidden rounded-[14px] border border-[#ECE0D0]"
+                    >
+                      <img
+                        src={photo.url}
+                        alt={photo.file?.name ?? "Fotografía existente"}
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        aria-label="Quitar foto"
+                        onClick={() => removePhoto(photo.id)}
+                        className="absolute right-[6px] top-[6px] flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-full border border-[#ECE0D0] bg-[#FFFDF9]"
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#C5503A"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Agregar fotos"
+                    className="flex h-[96px] w-[96px] flex-none cursor-pointer flex-col items-center justify-center gap-[6px] rounded-[14px] border-[1.5px] border-dashed border-[#DBCDBA] bg-[#F4ECE1] text-[12px] text-[#B0A290]"
+                  >
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#C5503A"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Agregar
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    aria-label="Seleccionar fotos"
+                    onChange={(event) => {
+                      addPhotos(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                  {errors.photos ? (
+                    <p
+                      id={photosErrorId}
+                      className={errorClassName}
+                      role="alert"
+                    >
+                      {errors.photos}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            </div>
             </form>
           </div>
         </div>

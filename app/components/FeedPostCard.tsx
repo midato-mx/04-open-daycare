@@ -1,13 +1,31 @@
+"use client";
+
+import { useState } from "react";
+import DeletePostDialog from "@/app/components/DeletePostDialog";
 import type { FeedPost, PostType } from "@/app/lib/data";
 
-const BADGE: Record<PostType, { label: string; colors: string }> = {
+type FeedPostCardProps = Readonly<{
+  post: FeedPost;
+}>;
+
+type Badge = {
+  label: string;
+  colors: string;
+};
+
+const BADGE: Record<PostType, Badge> = {
+  meal: { label: "COMIDA", colors: "bg-[#F4DC8E] text-[#9A7B1E]" },
+  nap: { label: "SIESTA", colors: "bg-[#E7DCF6] text-[#7B5FC0]" },
   achievement: { label: "LOGRO", colors: "bg-[#CFEBD8] text-[#3E9B6C]" },
   activity: { label: "ACTIVIDAD", colors: "bg-[#C7E7F1] text-[#2E89A6]" },
+  mood: { label: "ÁNIMO", colors: "bg-[#F9D2DE] text-[#C56486]" },
+  photo: { label: "FOTO", colors: "bg-[#FBD8CC] text-[#D9684A]" },
   announcement: { label: "ANUNCIO", colors: "bg-[#CCD8F4] text-[#4E72C8]" },
 };
 
-export default function FeedPostCard({ post }: { post: FeedPost }) {
+export default function FeedPostCard({ post }: FeedPostCardProps) {
   const badge = BADGE[post.type];
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   return (
     <article className="rounded-[20px] border border-[#ECE0D0] bg-[#FFFDF9] px-[22px] py-5 shadow-[0_4px_16px_-12px_rgba(120,90,60,0.5)]">
@@ -56,28 +74,29 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
         {post.body}
       </p>
 
-      {post.photoLabel && (
-        <a
-          href="#"
-          className="mt-3.5 flex h-[200px] flex-col items-center justify-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[#DBCDBA] bg-[#F4ECE1] text-[#B0A290]"
+      {post.photos.length > 0 && (
+        <div
+          className={`mt-3.5 grid gap-2 overflow-hidden rounded-[16px] ${
+            post.photos.length === 1 ? "grid-cols-1" : "grid-cols-2"
+          }`}
+          aria-label={`${post.photos.length} ${
+            post.photos.length === 1 ? "fotografía" : "fotografías"
+          }`}
         >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-3.6-3.6a2 2 0 0 0-2.8 0L6 21" />
-          </svg>
-          <span className="text-[13.5px]">{post.photoLabel}</span>
-        </a>
+          {post.photos.map((photo) => (
+            // Signed URLs are generated server-side and are intentionally not
+            // passed through next/image's public image configuration.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={photo.id}
+              src={photo.url}
+              alt={photo.alt}
+              className={`h-[200px] w-full object-cover ${
+                post.photos.length > 2 ? "max-h-[180px]" : ""
+              }`}
+            />
+          ))}
+        </div>
       )}
 
       <div className="mt-4 flex items-center gap-[18px] border-t border-[#F0E6D8] pt-3.5">
@@ -97,10 +116,7 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
           </svg>
           {post.likes}
         </span>
-        <a
-          href="#"
-          className="flex items-center gap-[7px] text-[14px] font-bold text-[#94887B]"
-        >
+        <span className="flex items-center gap-[7px] text-[14px] font-bold text-[#94887B]">
           <svg
             width="18"
             height="18"
@@ -115,15 +131,40 @@ export default function FeedPostCard({ post }: { post: FeedPost }) {
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" />
           </svg>
           {post.comments}
-        </a>
+        </span>
         <span className="flex-1" />
-        <a
-          href="#"
-          className="text-[14px] font-extrabold text-[#C5503A]"
-        >
-          Editar
-        </a>
+        {post.isAuthor ? (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("opendaycare:open-create-post", {
+                    detail: { post },
+                  }),
+                )
+              }
+              className="cursor-pointer border-none bg-transparent p-0 text-[14px] font-extrabold text-[#C5503A]"
+              data-post-action="edit"
+              data-post-id={post.id}
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="cursor-pointer border-none bg-transparent p-0 text-[14px] font-extrabold text-[#94887B]"
+            >
+              Eliminar
+            </button>
+          </>
+        ) : null}
       </div>
+      <DeletePostDialog
+        postId={post.id}
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+      />
     </article>
   );
 }

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type FormEvent,
@@ -69,9 +70,20 @@ export default function LinkParentDialog({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sentInvitationId, setSentInvitationId] = useState<string | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement>(null);
   const fullNameInputRef = useRef<HTMLInputElement>(null);
+  const submissionIdRef = useRef(0);
+  const formId = useId();
+  const dialogTitleId = `${formId}-title`;
+  const fullNameId = `${formId}-full-name`;
+  const fullNameErrorId = `${formId}-full-name-error`;
+  const emailId = `${formId}-email`;
+  const emailErrorId = `${formId}-email-error`;
+  const parentescoLabelId = `${formId}-parentesco-label`;
+  const parentescoErrorId = `${formId}-parentesco-error`;
 
   const resetForm = useCallback(() => {
+    submissionIdRef.current += 1;
     setFullName("");
     setEmail("");
     setParentesco("");
@@ -83,6 +95,7 @@ export default function LinkParentDialog({
   const closeModal = useCallback(() => {
     setIsOpen(false);
     resetForm();
+    triggerButtonRef.current?.focus();
   }, [resetForm]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -109,13 +122,18 @@ export default function LinkParentDialog({
 
     setIsSubmitting(true);
     setErrors({});
+    const submissionId = ++submissionIdRef.current;
     try {
       const result = await inviteParent({
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: email.trim(),
         relationship: parentesco,
         childId,
       });
+
+      if (submissionId !== submissionIdRef.current) {
+        return;
+      }
 
       if (!result.ok) {
         setErrors({ form: result.message });
@@ -123,8 +141,18 @@ export default function LinkParentDialog({
       }
 
       setSentInvitationId(result.invitationId);
+    } catch {
+      if (submissionId !== submissionIdRef.current) {
+        return;
+      }
+
+      setErrors({
+        form: "No pudimos enviar la invitación. Inténtalo de nuevo.",
+      });
     } finally {
-      setIsSubmitting(false);
+      if (submissionId === submissionIdRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -151,6 +179,7 @@ export default function LinkParentDialog({
     <>
       <button
         type="button"
+        ref={triggerButtonRef}
         onClick={() => setIsOpen(true)}
         className="flex cursor-pointer items-center gap-3 bg-transparent pt-2 text-left"
       >
@@ -178,14 +207,21 @@ export default function LinkParentDialog({
         <div
           className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-[rgba(40,32,26,0.5)] px-6 py-10"
           onClick={closeModal}
+          role="presentation"
         >
           <div
             className="h-fit w-full max-w-[480px] overflow-hidden rounded-[24px] border border-[#ECE0D0] bg-[#FBF4EC] shadow-[0_20px_50px_-24px_rgba(63,54,46,0.35)]"
             onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
           >
             <div className="flex items-center justify-between border-b border-[#ECE0D0] px-[26px] py-5">
               <div>
-                <div className="font-display text-[18px] font-semibold text-[#3F362E]">
+                <div
+                  id={dialogTitleId}
+                  className="font-display text-[18px] font-semibold text-[#3F362E]"
+                >
                   Vincular padre
                 </div>
                 <div className="text-[13px] text-[#A89A8B]">
@@ -232,12 +268,18 @@ export default function LinkParentDialog({
                       <path d="m5 12 4 4L19 6" />
                     </svg>
                   </span>
-                  <h2 className="m-0 font-display text-[20px] font-semibold text-[#3F362E]">
+                  <h2
+                    id={`${formId}-success-title`}
+                    className="m-0 font-display text-[20px] font-semibold text-[#3F362E]"
+                  >
                     Invitación enviada
                   </h2>
-                  <p className="mt-2 mb-0 max-w-[320px] text-[14px] leading-relaxed text-[#94887B]">
-                    Enviamos las instrucciones a <strong>{email}</strong>.
-                    La invitación vence en 24 horas.
+                  <p
+                    className="mt-2 mb-0 max-w-[320px] text-[14px] leading-relaxed text-[#94887B]"
+                    role="status"
+                  >
+                    Enviamos las instrucciones a <strong>{email}</strong>. La
+                    invitación vence en 24 horas.
                   </p>
                   <button
                     type="button"
@@ -251,159 +293,187 @@ export default function LinkParentDialog({
             ) : (
               <form noValidate onSubmit={handleSubmit}>
                 <div className="px-[26px] py-[22px]">
-                <div className="mb-5 flex gap-[11px] rounded-[14px] bg-[#E3ECFB] px-4 py-[13px]">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#4E72C8"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mt-px flex-none"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 16v-4M12 8h.01" />
-                  </svg>
-                  <span className="text-[13.5px] leading-[1.45] text-[#3F5694]">
-                    Le enviaremos un correo con un código para que active su
-                    cuenta. Solo verá el feed de {getKidFirstName(kidFullName)}.
-                  </span>
-                </div>
-
-                <label
-                  htmlFor="link-parent-full-name"
-                  className={labelClassName}
-                >
-                  NOMBRE DEL PADRE/MADRE
-                </label>
-                <input
-                  id="link-parent-full-name"
-                  name="fullName"
-                  ref={fullNameInputRef}
-                  type="text"
-                  value={fullName}
-                  onChange={(event) => {
-                    setFullName(event.target.value);
-                    setErrors((prev) => withoutError(prev, "fullName"));
-                  }}
-                  placeholder="Ej. Diego Fernández"
-                  className={`${inputClassName} ${
-                    errors.fullName ? "mb-[6px]" : "mb-[18px]"
-                  } ${fieldBorder(Boolean(errors.fullName))}`}
-                />
-                {errors.fullName ? (
-                  <p className={`mb-[18px] ${errorClassName}`}>
-                    {errors.fullName}
-                  </p>
-                ) : null}
-
-                <label htmlFor="link-parent-email" className={labelClassName}>
-                  EMAIL
-                </label>
-                <input
-                  id="link-parent-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setErrors((prev) => withoutError(prev, "email"));
-                  }}
-                  placeholder="correo@ejemplo.com"
-                  className={`${inputClassName} ${
-                    errors.email ? "mb-[6px]" : "mb-[18px]"
-                  } ${fieldBorder(Boolean(errors.email))}`}
-                />
-                {errors.email ? (
-                  <p className={`mb-[18px] ${errorClassName}`}>
-                    {errors.email}
-                  </p>
-                ) : null}
-
-                <div
-                  id="link-parent-parentesco"
-                  role="group"
-                  aria-label="Parentesco"
-                >
-                  <div className={labelClassName}>PARENTESCO</div>
-                  <div className="mb-5 flex gap-[9px]">
-                    {parentescoOptions.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        aria-pressed={parentesco === option}
-                        onClick={() => {
-                          setParentesco(option);
-                          setErrors((prev) => withoutError(prev, "parentesco"));
-                        }}
-                        className={`flex-1 rounded-full py-[11px] ${
-                          parentesco === option
-                            ? parentescoSelectedClassName
-                            : parentescoUnselectedClassName
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    ))}
+                  <div className="mb-5 flex gap-[11px] rounded-[14px] bg-[#E3ECFB] px-4 py-[13px]">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#4E72C8"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mt-px flex-none"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    <span className="text-[13.5px] leading-[1.45] text-[#3F5694]">
+                      Le enviaremos un correo con un código para que active su
+                      cuenta. Solo verá el feed de{" "}
+                      {getKidFirstName(kidFullName)}.
+                    </span>
                   </div>
-                 {errors.parentesco ? (
-                    <p className={errorClassName}>{errors.parentesco}</p>
+
+                  <label htmlFor={fullNameId} className={labelClassName}>
+                    NOMBRE DEL PADRE/MADRE
+                  </label>
+                  <input
+                    id={fullNameId}
+                    name="fullName"
+                    ref={fullNameInputRef}
+                    type="text"
+                    value={fullName}
+                    aria-invalid={Boolean(errors.fullName)}
+                    aria-describedby={
+                      errors.fullName ? fullNameErrorId : undefined
+                    }
+                    onChange={(event) => {
+                      setFullName(event.target.value);
+                      setErrors((prev) =>
+                        withoutError(withoutError(prev, "fullName"), "form"),
+                      );
+                    }}
+                    placeholder="Ej. Diego Fernández"
+                    className={`${inputClassName} ${
+                      errors.fullName ? "mb-[6px]" : "mb-[18px]"
+                    } ${fieldBorder(Boolean(errors.fullName))}`}
+                  />
+                  {errors.fullName ? (
+                    <p
+                      id={fullNameErrorId}
+                      className={`mb-[18px] ${errorClassName}`}
+                    >
+                      {errors.fullName}
+                    </p>
                   ) : null}
-                </div>
 
-                {errors.form ? (
-                  <p className={`mb-5 ${errorClassName}`}>{errors.form}</p>
-                ) : null}
+                  <label htmlFor={emailId} className={labelClassName}>
+                    EMAIL
+                  </label>
+                  <input
+                    id={emailId}
+                    name="email"
+                    type="email"
+                    value={email}
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? emailErrorId : undefined}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setErrors((prev) =>
+                        withoutError(withoutError(prev, "email"), "form"),
+                      );
+                    }}
+                    placeholder="correo@ejemplo.com"
+                    className={`${inputClassName} ${
+                      errors.email ? "mb-[6px]" : "mb-[18px]"
+                    } ${fieldBorder(Boolean(errors.email))}`}
+                  />
+                  {errors.email ? (
+                    <p
+                      id={emailErrorId}
+                      className={`mb-[18px] ${errorClassName}`}
+                    >
+                      {errors.email}
+                    </p>
+                  ) : null}
 
-                <div className="mb-5 rounded-[16px] border-[1.5px] border-dashed border-[#E6D08A] bg-[#FBF1D6] py-[18px] text-center">
-                  <div className="mb-2 text-[12px] font-extrabold tracking-[0.7px] text-[#A88526]">
-                    CÓDIGO DE INVITACIÓN
+                  <div
+                    id="link-parent-parentesco"
+                    role="group"
+                    aria-labelledby={parentescoLabelId}
+                    aria-describedby={
+                      errors.parentesco ? parentescoErrorId : undefined
+                    }
+                  >
+                    <div id={parentescoLabelId} className={labelClassName}>
+                      PARENTESCO
+                    </div>
+                    <div className="mb-5 flex gap-[9px]">
+                      {parentescoOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={parentesco === option}
+                          onClick={() => {
+                            setParentesco(option);
+                            setErrors((prev) =>
+                              withoutError(
+                                withoutError(prev, "parentesco"),
+                                "form",
+                              ),
+                            );
+                          }}
+                          className={`flex-1 rounded-full py-[11px] ${
+                            parentesco === option
+                              ? parentescoSelectedClassName
+                              : parentescoUnselectedClassName
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                    {errors.parentesco ? (
+                      <p id={parentescoErrorId} className={errorClassName}>
+                        {errors.parentesco}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="font-display text-[24px] font-semibold tracking-[2px] text-[#8A7234]">
-                    Se generará al enviar
-                  </div>
-                  <div className="mt-[6px] text-[13px] text-[#A88526]">
-                    Válido durante 24 horas
-                  </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  aria-busy={isSubmitting}
-                  className="flex w-full cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-none bg-[linear-gradient(180deg,#F4977E,#EE8164)] py-[14px] text-[15.5px] font-extrabold text-white shadow-[0_10px_22px_-8px_rgba(238,129,100,0.7)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span
-                        className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white border-t-transparent"
-                        aria-hidden="true"
-                      />
-                      Enviando…
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#fff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="m22 2-7 20-4-9-9-4z" />
-                        <path d="M22 2 11 13" />
-                      </svg>
-                      Enviar invitación
-                    </>
-                  )}
-                </button>
+                  {errors.form ? (
+                    <p className={`mb-5 ${errorClassName}`} role="alert">
+                      {errors.form}
+                    </p>
+                  ) : null}
+
+                  <div className="mb-5 rounded-[16px] border-[1.5px] border-dashed border-[#E6D08A] bg-[#FBF1D6] py-[18px] text-center">
+                    <div className="mb-2 text-[12px] font-extrabold tracking-[0.7px] text-[#A88526]">
+                      CÓDIGO DE INVITACIÓN
+                    </div>
+                    <div className="font-display text-[24px] font-semibold tracking-[2px] text-[#8A7234]">
+                      Se generará al enviar
+                    </div>
+                    <div className="mt-[6px] text-[13px] text-[#A88526]">
+                      Válido durante 24 horas
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    aria-busy={isSubmitting}
+                    className="flex w-full cursor-pointer items-center justify-center gap-[9px] rounded-[14px] border-none bg-[linear-gradient(180deg,#F4977E,#EE8164)] py-[14px] text-[15.5px] font-extrabold text-white shadow-[0_10px_22px_-8px_rgba(238,129,100,0.7)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span
+                          className="h-[18px] w-[18px] animate-spin rounded-full border-2 border-white border-t-transparent"
+                          aria-hidden="true"
+                        />
+                        Enviando…
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          width="19"
+                          height="19"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m22 2-7 20-4-9-9-4z" />
+                          <path d="M22 2 11 13" />
+                        </svg>
+                        Enviar invitación
+                      </>
+                    )}
+                  </button>
                 </div>
               </form>
             )}

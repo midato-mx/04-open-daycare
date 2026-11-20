@@ -13,9 +13,9 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen grid-cols-[1.05fr_1fr] bg-[#FBF4EC]">
-      <div
-        className="relative flex flex-col justify-between overflow-hidden p-[56px_60px] text-white"
+    <main className="grid min-h-screen grid-cols-1 bg-[#FBF4EC] lg:grid-cols-[1.05fr_1fr]">
+      <aside
+        className="relative flex flex-col justify-between overflow-hidden p-8 text-white lg:p-[56px_60px]"
         style={{
           background:
             "linear-gradient(155deg,#F6A98E 0%,#F2937A 45%,#EC7E62 100%)",
@@ -61,11 +61,17 @@ export default async function LoginPage() {
         <div className="relative text-[14px] text-white/90">
           🌿 Guardería Sala Soles
         </div>
-      </div>
+      </aside>
 
-      <div className="flex items-center justify-center p-10">
+      <section
+        aria-labelledby="login-heading"
+        className="flex items-center justify-center p-6 lg:p-10"
+      >
         <div className="w-full max-w-[392px]">
-          <h2 className="mb-1.5 font-display text-[30px] font-semibold text-[#3F362E]">
+          <h2
+            id="login-heading"
+            className="mb-1.5 font-display text-[30px] font-semibold text-[#3F362E]"
+          >
             Iniciar sesión
           </h2>
           <p className="mb-7 text-[15px] text-[#94887B]">
@@ -74,7 +80,7 @@ export default async function LoginPage() {
 
           <LoginForm />
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
