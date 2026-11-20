@@ -1,6 +1,6 @@
 ---
 description: Verifica, corrige y marca los checks del "Acceptance criteria" de un spec (Context7 + Playwright + visión).
-mode: all
+mode: subagent
 model: openai/gpt-5.6-luna
 permission:
   edit: allow

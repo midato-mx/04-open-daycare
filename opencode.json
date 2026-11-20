@@ -18,7 +18,7 @@
       "description": "Implementa especificaciones de pantallas y funcionalidades",
       "template": "Carga y sigue la skill spec-impl en .agents/skills/spec-impl/SKILL.md.\n\nFeature: $ARGUMENTS"
     },
-    "accessibility-checker": {
+    "a11y": {
       "description": "Revisa y corrige accesibilidad WCAG 2.2 AA en archivos indicados",
       "agent": "accessibility-checker",
       "template": "Revisa exclusivamente los archivos o directorios indicados contra WCAG 2.2 AA y aplica correcciones seguras, siguiendo las instrucciones de `.opencode/agent/accessibility-checker.md`.\n\nArchivos o directorios objetivo: $ARGUMENTS"
@@ -27,6 +27,11 @@
       "description": "Revisa y mejora código React con buenas prácticas actuales",
       "agent": "react-best-practices",
       "template": "Revisa exclusivamente los archivos o directorios indicados y aplica mejoras justificadas de React, siguiendo las instrucciones de `.opencode/agent/react-best-practices.md`.\n\nArchivos o directorios objetivo: $ARGUMENTS"
+    },
+    "db-audit": {
+      "description": "Audita la seguridad de Supabase/Postgres y el aislamiento entre familias",
+      "agent": "db-security-auditor",
+      "template": "Audita la seguridad de Supabase/Postgres siguiendo `.opencode/agent/db-security-auditor.md`.\n\nAlcance, tablas, migraciones, archivos o comportamiento a revisar: $ARGUMENTS"
     }
   },
   "references": {

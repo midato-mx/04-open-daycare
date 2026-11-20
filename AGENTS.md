@@ -42,8 +42,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Subagentes especializados
 
-- `/accessibility-checker` (`.opencode/agent/accessibility-checker.md`): revisa exclusivamente los archivos indicados frente a WCAG 2.2 AA, corrige problemas confirmados de accesibilidad y valida con TypeScript, ESLint y Playwright cuando aplica.
+- `/a11y` (`.opencode/agent/accessibility-checker.md`): revisa exclusivamente los archivos indicados frente a WCAG 2.2 AA, corrige problemas confirmados de accesibilidad y valida con TypeScript, ESLint y Playwright cuando aplica.
 - `/react-best-practices` (`.opencode/agent/react-best-practices.md`): revisa y mejora los archivos React indicados, enfocándose en composición, hooks, estado, rendimiento, accesibilidad y tipado; consulta Context7 antes de aplicar recomendaciones dependientes de React, Next.js o sus librerías.
+- `/db-audit` (`.opencode/agent/db-security-auditor.md`): audita Supabase/Postgres para prevenir fugas entre niños, padres/tutores, familias, centros y roles; revisa RLS, privilegios, funciones, vistas, Storage, Auth y aislamiento multi-tenant sin aplicar cambios destructivos automáticamente.
 
 ## MCPs
 
